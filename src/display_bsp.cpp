@@ -22,8 +22,15 @@ DisplayPort::DisplayPort(int mosi, int scl, int dc, int cs, int rst, int width, 
   buscfg.quadwp_io_num = -1;
   buscfg.quadhd_io_num = -1;
   buscfg.max_transfer_sz = transfer;
+
+  // #region agent log
+  ESP_LOGI("DisplayPort", "init bus host=%d mosi=%d scl=%d", spihost, mosi_, scl_);
+  // #endregion
+
   ret = spi_bus_initialize(spihost, &buscfg, SPI_DMA_CH_AUTO);
-  ESP_ERROR_CHECK(ret);
+  if (ret != ESP_OK && ret != ESP_ERR_INVALID_STATE) {
+    ESP_ERROR_CHECK(ret);
+  }
 
   esp_lcd_panel_io_spi_config_t io_config = {};
   io_config.dc_gpio_num = dc_;
