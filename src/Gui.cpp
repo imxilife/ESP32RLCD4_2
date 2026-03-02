@@ -3,50 +3,21 @@
 //
 
 #include "Gui.h"
+#include "Font5x7.h"
+#include "FontDigits.h"
+#include "GlyphEffect.h"
+#include "chinese_font.h"
 
 #include <stdlib.h>
 #include <stdint.h>
 
-// ========================== 内部帮助函数与字体定义 ==========================
+// 大号数字效果处理缓冲（72x96 stride=9 → 864 字节）
+// 若后续更换大号数字字体尺寸，请同步调整缓冲区大小：strideBytes * height
+static uint8_t s_bigDigitEffectBuffer[864];
+
+// ========================== 内部帮助函数 ==========================
 
 namespace {
-
-// 5x7 全 ASCII 可打印字符点阵 (0x20~0x7F 共 96 个)，每字符 5 列，每列 1 字节（bit0=顶行）
-// 来源：Adafruit 5x7 风格；使用时仅索引 0x20~0x7E
-static const uint8_t kFont5x7Full[96][5] = {
-    {0x00,0x00,0x00,0x00,0x00}, {0x00,0x00,0x5F,0x00,0x00}, {0x00,0x07,0x00,0x07,0x00},
-    {0x14,0x7F,0x14,0x7F,0x14}, {0x24,0x2A,0x7F,0x2A,0x12}, {0x23,0x13,0x08,0x64,0x62},
-    {0x36,0x49,0x56,0x20,0x50}, {0x00,0x08,0x07,0x03,0x00}, {0x00,0x1C,0x22,0x41,0x00},
-    {0x00,0x41,0x22,0x1C,0x00}, {0x2A,0x1C,0x7F,0x1C,0x2A}, {0x08,0x08,0x3E,0x08,0x08},
-    {0x00,0x80,0x70,0x30,0x00}, {0x08,0x08,0x08,0x08,0x08}, {0x00,0x00,0x60,0x60,0x00},
-    {0x20,0x10,0x08,0x04,0x02}, {0x3E,0x51,0x49,0x45,0x3E}, {0x00,0x42,0x7F,0x40,0x00},
-    {0x72,0x49,0x49,0x49,0x46}, {0x21,0x41,0x49,0x4D,0x33}, {0x18,0x14,0x12,0x7F,0x10},
-    {0x27,0x45,0x45,0x45,0x39}, {0x3C,0x4A,0x49,0x49,0x31}, {0x41,0x21,0x11,0x09,0x07},
-    {0x36,0x49,0x49,0x49,0x36}, {0x46,0x49,0x49,0x29,0x1E}, {0x00,0x00,0x14,0x00,0x00},
-    {0x00,0x40,0x34,0x00,0x00}, {0x00,0x08,0x14,0x22,0x41}, {0x14,0x14,0x14,0x14,0x14},
-    {0x00,0x41,0x22,0x14,0x08}, {0x02,0x01,0x59,0x09,0x06}, {0x3E,0x41,0x5D,0x59,0x4E},
-    {0x7C,0x12,0x11,0x12,0x7C}, {0x7F,0x49,0x49,0x49,0x36}, {0x3E,0x41,0x41,0x41,0x22},
-    {0x7F,0x41,0x41,0x41,0x3E}, {0x7F,0x49,0x49,0x49,0x41}, {0x7F,0x09,0x09,0x09,0x01},
-    {0x3E,0x41,0x41,0x51,0x73}, {0x7F,0x08,0x08,0x08,0x7F}, {0x00,0x41,0x7F,0x41,0x00},
-    {0x20,0x40,0x41,0x3F,0x01}, {0x7F,0x08,0x14,0x22,0x41}, {0x7F,0x40,0x40,0x40,0x40},
-    {0x7F,0x02,0x1C,0x02,0x7F}, {0x7F,0x04,0x08,0x10,0x7F}, {0x3E,0x41,0x41,0x41,0x3E},
-    {0x7F,0x09,0x09,0x09,0x06}, {0x3E,0x41,0x51,0x21,0x5E}, {0x7F,0x09,0x19,0x29,0x46},
-    {0x26,0x49,0x49,0x49,0x32}, {0x03,0x01,0x7F,0x01,0x03}, {0x3F,0x40,0x40,0x40,0x3F},
-    {0x1F,0x20,0x40,0x20,0x1F}, {0x3F,0x40,0x38,0x40,0x3F}, {0x63,0x14,0x08,0x14,0x63},
-    {0x03,0x04,0x78,0x04,0x03}, {0x61,0x59,0x49,0x4D,0x43}, {0x00,0x7F,0x41,0x41,0x41},
-    {0x02,0x04,0x08,0x10,0x20}, {0x00,0x41,0x41,0x41,0x7F}, {0x04,0x02,0x01,0x02,0x04},
-    {0x40,0x40,0x40,0x40,0x40}, {0x00,0x03,0x07,0x08,0x00}, {0x20,0x54,0x54,0x78,0x40},
-    {0x7F,0x28,0x44,0x44,0x38}, {0x38,0x44,0x44,0x44,0x28}, {0x38,0x44,0x44,0x28,0x7F},
-    {0x38,0x54,0x54,0x54,0x18}, {0x00,0x08,0x7E,0x09,0x02}, {0x18,0xA4,0xA4,0x9C,0x78},
-    {0x7F,0x08,0x04,0x04,0x78}, {0x00,0x44,0x7D,0x40,0x00}, {0x20,0x40,0x40,0x3D,0x00},
-    {0x7F,0x10,0x28,0x44,0x00}, {0x00,0x41,0x7F,0x40,0x00}, {0x7C,0x04,0x78,0x04,0x78},
-    {0x7C,0x08,0x04,0x04,0x78}, {0x38,0x44,0x44,0x44,0x38}, {0xFC,0x18,0x24,0x24,0x18},
-    {0x18,0x24,0x24,0x18,0xFC}, {0x7C,0x08,0x04,0x04,0x08}, {0x48,0x54,0x54,0x54,0x24},
-    {0x04,0x04,0x3F,0x44,0x24}, {0x3C,0x40,0x40,0x20,0x7C}, {0x1C,0x20,0x40,0x20,0x1C},
-    {0x3C,0x40,0x30,0x40,0x3C}, {0x44,0x28,0x10,0x28,0x44}, {0x4C,0x90,0x90,0x90,0x7C},
-    {0x44,0x64,0x54,0x4C,0x44}, {0x00,0x08,0x36,0x41,0x00}, {0x00,0x00,0x77,0x00,0x00},
-    {0x00,0x41,0x36,0x08,0x00}, {0x02,0x01,0x02,0x04,0x02}, {0x3C,0x26,0x23,0x26,0x3C},
-};
 
 // UTF-8 解码，返回下一个 Unicode 码点，失败时返回 false 并跳过当前字节。
 bool DecodeNextUTF8(const char *&p, uint32_t &codepoint) {
@@ -112,7 +83,8 @@ Gui::Gui(DisplayPort *lcd, int width, int height)
       height_(height),
       fgColor_(ColorBlack),
       bgColor_(ColorWhite),
-      chineseGlyphProvider_(nullptr) {}
+      chineseGlyphProvider_(nullptr),
+      bigDigitEffect_(BigDigitEffectParamsDefault()) {}
 
 void Gui::clear(uint8_t color) {
     if (!lcd_) {
@@ -344,44 +316,28 @@ void Gui::fillRoundRect(int x, int y, int w, int h, int radius, uint8_t color) {
         radius = h / 2;
     }
 
-    int x1 = x + w - 1;
-    int y1 = y + h - 1;
+    // 左/右圆角圆心的 x 坐标
+    int cx_left  = x + radius;
+    int cx_right = x + w - 1 - radius;
 
-    // 先填充中间的矩形部分
-    fillRect(x + radius, y, w - 2 * radius, h, color);
+    // 中间矩形带（圆角高度以外的区域，全宽）
+    fillRect(x, y + radius, w, h - 2 * radius, color);
 
-    // 使用水平扫描线填充四个圆角（圆心与 drawRoundRect 一致）
-    int r = radius;
-    int dx = r;
-    int dy = 0;
-    int err = 1 - r;
-    while (dx >= dy) {
-        int topY1 = y + r - dx;
-        int topY2 = y + r - dy;
-        int leftX1 = x + r - dx;
-        int leftX2 = x + r - dy;
-        int rightX1 = x1 - r + dx;
-        int rightX2 = x1 - r + dy;
-
-        drawLine(leftX1, topY1, rightX1, topY1, color);
-        if (dx != dy) {
-            drawLine(leftX2, topY2, rightX2, topY2, color);
+    // 扫描线填充上下圆角区域：
+    // 对 dy = 0..radius-1，计算圆弧在该行的水平跨度 horiz，
+    // 然后画满从左弧到右弧的整行。
+    for (int dy = 0; dy < radius; ++dy) {
+        // vert：当前行到圆心行的垂直距离
+        int vert = radius - dy;
+        // horiz：满足 horiz^2 + vert^2 <= radius^2 的最大整数
+        int horiz = 0;
+        while ((horiz + 1) * (horiz + 1) + vert * vert <= radius * radius) {
+            ++horiz;
         }
-
-        int bottomY1 = y1 - r + dy;
-        int bottomY2 = y1 - r + dx;
-        drawLine(leftX1, bottomY1, rightX1, bottomY1, color);
-        if (dx != dy) {
-            drawLine(leftX2, bottomY2, rightX2, bottomY2, color);
-        }
-
-        ++dy;
-        if (err < 0) {
-            err += (dy << 1) + 1;
-        } else {
-            --dx;
-            err += ((dy - dx) << 1) + 1;
-        }
+        // 上圆角行：y + dy，从 (cx_left - horiz) 到 (cx_right + horiz)
+        drawLine(cx_left - horiz, y + dy, cx_right + horiz, y + dy, color);
+        // 下圆角行：y + h - 1 - dy
+        drawLine(cx_left - horiz, y + h - 1 - dy, cx_right + horiz, y + h - 1 - dy, color);
     }
 }
 
@@ -476,11 +432,11 @@ void Gui::fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint8_t c
 
 void Gui::drawChar(int x, int y, char c, uint8_t color) {
     // 可打印 ASCII 0x20~0x7E 使用 5x7 点阵，不可打印字符画成小方框
-    if (static_cast<unsigned char>(c) < 0x20 || static_cast<unsigned char>(c) > 0x7E) {
+    const uint8_t *bitmap = Font5x7_GetGlyph(static_cast<unsigned char>(c));
+    if (!bitmap) {
         drawRect(x, y, 3, 7, color);
         return;
     }
-    const uint8_t *bitmap = kFont5x7Full[static_cast<unsigned char>(c) - 0x20];
     for (int col = 0; col < 5; ++col) {
         uint8_t line = bitmap[col];
         for (int row = 0; row < 7; ++row) {
@@ -497,12 +453,12 @@ void Gui::drawChar(int x, int y, char c) {
 
 void Gui::drawChar(int x, int y, char c, uint8_t fgColor, uint8_t bgColor) {
     unsigned char uc = static_cast<unsigned char>(c);
-    if (uc < 0x20 || uc > 0x7E) {
+    const uint8_t *bitmap = Font5x7_GetGlyph(uc);
+    if (!bitmap) {
         fillRect(x, y, 3, 7, bgColor);
         drawRect(x, y, 3, 7, fgColor);
         return;
     }
-    const uint8_t *bitmap = kFont5x7Full[uc - 0x20];
     for (int col = 0; col < 5; ++col) {
         uint8_t line = bitmap[col];
         for (int row = 0; row < 7; ++row) {
@@ -555,13 +511,16 @@ void Gui::drawUTF8String(int x, int y, const char *utf8, uint8_t color) {
             drawChar(cursorX, y, static_cast<char>(codepoint), color);
             cursorX += 6;
         } else {
-            // 非 ASCII，按中文处理：优先查找外部点阵，否则画 16x16 占位符
+            // 非 ASCII，按中文处理：先外部 provider，再内置 世/界/中/文，最后占位符
             int w = 0;
             int h = 0;
             int stride = 0;
             const uint8_t *glyph = nullptr;
             if (chineseGlyphProvider_) {
                 glyph = chineseGlyphProvider_(codepoint, w, h, stride);
+            }
+            if (!glyph || w <= 0 || h <= 0 || stride <= 0) {
+                glyph = ChineseFont_GetGlyph(codepoint, w, h, stride);
             }
 
             if (glyph && w > 0 && h > 0 && stride > 0) {
@@ -597,13 +556,16 @@ void Gui::drawUTF8String(int x, int y, const char *utf8, uint8_t fgColor, uint8_
             drawChar(cursorX, y, static_cast<char>(codepoint), fgColor, bgColor);
             cursorX += 6;
         } else {
-            // 非 ASCII：按中文处理
+            // 非 ASCII：先外部 provider，再内置 世/界/中/文，最后占位符
             int w = 0;
             int h = 0;
             int stride = 0;
             const uint8_t *glyph = nullptr;
             if (chineseGlyphProvider_) {
                 glyph = chineseGlyphProvider_(codepoint, w, h, stride);
+            }
+            if (!glyph || w <= 0 || h <= 0 || stride <= 0) {
+                glyph = ChineseFont_GetGlyph(codepoint, w, h, stride);
             }
 
             if (glyph && w > 0 && h > 0 && stride > 0) {
@@ -633,6 +595,118 @@ void Gui::drawUTF8String(int x, int y, const char *utf8, uint8_t fgColor, uint8_
     }
 }
 
+void Gui::drawBigDigits(int x, int y, const char *text, uint8_t color) {
+    if (!text) {
+        return;
+    }
+    int cursorX = x;
+    while (*text) {
+        int w = 0;
+        int h = 0;
+        int stride = 0;
+        const uint8_t *glyph = FontBig72x96_GetGlyph(*text, w, h, stride);
+        if (glyph && w > 0 && h > 0) {
+            const uint8_t *drawGlyph = GlyphEffect_Apply(glyph, s_bigDigitEffectBuffer,
+                                                        w, h, stride, bigDigitEffect_);
+            drawBitmap(cursorX, y, w, h, drawGlyph, color);
+            cursorX += w;
+        } else {
+            cursorX += 8;
+        }
+        ++text;
+    }
+}
+
+void Gui::drawBigDigits(int x, int y, const char *text) {
+    drawBigDigits(x, y, text, fgColor_, bgColor_);
+}
+
+void Gui::drawBigDigits(int x, int y, const char *text, uint8_t fgColor, uint8_t bgColor) {
+    if (!text) {
+        return;
+    }
+    int cursorX = x;
+    while (*text) {
+        int w = 0;
+        int h = 0;
+        int stride = 0;
+        const uint8_t *glyph = FontBig72x96_GetGlyph(*text, w, h, stride);
+        if (glyph && w > 0 && h > 0 && stride > 0) {
+            const uint8_t *drawGlyph = GlyphEffect_Apply(glyph, s_bigDigitEffectBuffer,
+                                                        w, h, stride, bigDigitEffect_);
+            fillRect(cursorX, y, w, h, bgColor);
+            for (int j = 0; j < h; ++j) {
+                for (int i = 0; i < w; ++i) {
+                    int byteIndex = j * stride + (i >> 3);
+                    int bitIndex = 7 - (i & 0x7);
+                    uint8_t b = drawGlyph[byteIndex];
+                    if (b & (1U << bitIndex)) {
+                        drawPixel(cursorX + i, y + j, fgColor);
+                    }
+                }
+            }
+            cursorX += w;
+        } else {
+            cursorX += 8;
+        }
+        ++text;
+    }
+}
+
+void Gui::drawSmallDigits(int x, int y, const char *text, uint8_t color) {
+    if (!text) {
+        return;
+    }
+    int cursorX = x;
+    while (*text) {
+        int w = 0;
+        int h = 0;
+        int stride = 0;
+        const uint8_t *glyph = FontSmall24x32_GetGlyph(*text, w, h, stride);
+        if (glyph && w > 0 && h > 0) {
+            drawBitmap(cursorX, y, w, h, glyph, color);
+            cursorX += w;
+        } else {
+            cursorX += 6;
+        }
+        ++text;
+    }
+}
+
+void Gui::drawSmallDigits(int x, int y, const char *text) {
+    drawSmallDigits(x, y, text, fgColor_, bgColor_);
+}
+
+void Gui::drawSmallDigits(int x, int y, const char *text, uint8_t fgColor, uint8_t bgColor) {
+    if (!text) {
+        return;
+    }
+    int cursorX = x;
+    while (*text) {
+        int w = 0;
+        int h = 0;
+        int stride = 0;
+        const uint8_t *glyph = FontSmall24x32_GetGlyph(*text, w, h, stride);
+        if (glyph && w > 0 && h > 0 && stride > 0) {
+            fillRect(cursorX, y, w, h, bgColor);
+            for (int j = 0; j < h; ++j) {
+                for (int i = 0; i < w; ++i) {
+                    int byteIndex = j * stride + (i >> 3);
+                    int bitIndex = 7 - (i & 0x7);
+                    uint8_t b = glyph[byteIndex];
+                    if (b & (1U << bitIndex)) {
+                        drawPixel(cursorX + i, y + j, fgColor);
+                    }
+                }
+            }
+            cursorX += w;
+        } else {
+            cursorX += 6;
+        }
+        ++text;
+    }
+}
+
 void Gui::drawBitmap(int x, int y, int w, int h, const uint8_t *bitmap, uint8_t color) {
     if (!bitmap || w <= 0 || h <= 0) {
         return;
@@ -655,5 +729,18 @@ void Gui::drawBitmap(int x, int y, int w, int h, const uint8_t *bitmap, uint8_t 
 
 void Gui::setChineseGlyphProvider(ChineseGlyphProvider provider) {
     chineseGlyphProvider_ = provider;
+}
+
+void Gui::setBigDigitEffectParams(const BigDigitEffectParams &params) {
+    bigDigitEffect_ = params;
+}
+
+void Gui::setBigDigitEffectParams(int boldLevel, int outlineWidth) {
+    bigDigitEffect_.boldLevel = boldLevel;
+    bigDigitEffect_.outlineWidth = outlineWidth;
+}
+
+const BigDigitEffectParams &Gui::bigDigitEffectParams() const {
+    return bigDigitEffect_;
 }
 

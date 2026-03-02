@@ -5,6 +5,7 @@
 #pragma once
 
 #include "display_bsp.h"   // 里面有 DisplayPort 和 ColorBlack/ColorWhite
+#include "GlyphEffect.h"
 
 #ifndef ESP32_RLCD4_2_GUI_H
 #define ESP32_RLCD4_2_GUI_H
@@ -115,6 +116,31 @@ public:
     /// 使用显式前景/背景色画 UTF-8 字符串（会覆盖字符串区域背景）
     void drawUTF8String(int x, int y, const char *utf8, uint8_t fgColor, uint8_t bgColor);
 
+    /// 使用大号 72x96 数字字体画字符串（仅支持 0-9、':'、'.'），显式前景色
+    void drawBigDigits(int x, int y, const char *text, uint8_t color);
+
+    /// 使用大号 72x96 数字字体画字符串，当前前景/背景色
+    void drawBigDigits(int x, int y, const char *text);
+
+    /// 使用大号 72x96 数字字体画字符串，显式前景/背景色
+    void drawBigDigits(int x, int y, const char *text, uint8_t fgColor, uint8_t bgColor);
+
+    /// 设置大号数字效果参数（加粗、描边），修改后影响后续 drawBigDigits
+    void setBigDigitEffectParams(const BigDigitEffectParams &params);
+    void setBigDigitEffectParams(int boldLevel, int outlineWidth = 0);
+
+    /// 获取当前大号数字效果参数
+    const BigDigitEffectParams &bigDigitEffectParams() const;
+
+    /// 使用小号 16x24 数字字体画字符串（仅支持 0-9、':'、'.'），显式前景色
+    void drawSmallDigits(int x, int y, const char *text, uint8_t color);
+
+    /// 使用小号 16x24 数字字体画字符串，当前前景/背景色
+    void drawSmallDigits(int x, int y, const char *text);
+
+    /// 使用小号 16x24 数字字体画字符串，显式前景/背景色
+    void drawSmallDigits(int x, int y, const char *text, uint8_t fgColor, uint8_t bgColor);
+
     // === 位图 ===
 
     /// 画 1bpp 位图（按行从左到右，高位在左），color 表示点亮像素的颜色
@@ -134,6 +160,7 @@ private:
     uint8_t bgColor_;  ///< 当前背景色
 
     ChineseGlyphProvider chineseGlyphProvider_;
+    BigDigitEffectParams bigDigitEffect_;  ///< 大号数字加粗/描边参数
 };
 
 #endif //ESP32_RLCD4_2_GUI_H
