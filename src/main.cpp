@@ -84,12 +84,8 @@ void setup() {
     gui.drawUTF8String(10, 220, "UTF8 \xE4\xB8\xAD\xE6\x96\x87", ColorBlack, ColorWhite); // "UTF8 中文"
 #endif
 
-    // 4.6 大号数字字体显示时间（72x96，Arial Black，无需额外加粗）
-    gui.setBigDigitEffectParams(0, 0);  // 字体本身已是超粗，不需要 GlyphEffect
-    gui.drawBigDigits((400 - 5 * 72) / 2, 30, "22:33", ColorBlack);
-
-    // 4.7 小号数字字体显示数值（24x32，Arial Bold）
-    gui.drawSmallDigits(20, 260, "22.9", ColorBlack);
+    // 4.6 大号数字字体参数（72x96，Arial Black）
+    gui.setBigDigitEffectParams(0, 0);
 
     // 5. 刷新到 LCD
     gui.display();
@@ -99,7 +95,7 @@ void setup() {
     rtc.begin(13, 14);
 
     // 设置初始时间：2026/03/02 17:50:00 星期一
-    rtc.setTime(2026, 3, 2, 17, 50, 0, 1);  // 1=星期一
+    rtc.setTime(2026, 3, 2, 23, 34, 0, 1);  // 1=星期一
     delay(100);  // 等待振荡器稳定
 
     // 读取并验证时间
@@ -123,31 +119,108 @@ void setup() {
     Serial.println("SHTC3 初始化成功！");
 }
 
+// ── 时间显示参数（居中，大号 72x96）──────────────────────────
+static const int kTimeCharW  = 72;
+static const int kTimeCharH  = 96;
+static const int kTimeStrLen = 5;   // "HH:MM"
+static const int kTimeX = (400 - kTimeStrLen * kTimeCharW) / 2;
+static const int kTimeY = (300 - kTimeCharH) / 2;
+
+// ── 日期/星期显示参数（右上角，小号 24x32）────────────────────
+// 日期 "03/02"：5 字符 × 24px = 120px
+// 星期 "星期三"：3 汉字 × 16px = 48px（中文字库 16x16）
+// 两行竖排，顶部留 10px 边距，右边留 10px
+static const int kDateY    = 8;           // 日期行 Y
+static const int kWeekY    = kDateY + 32 + 4;  // 星期行 Y（日期高32，间距4）
+static const int kDateRightMargin = 10;   // 距屏幕右边距
+
+// 星期名称对应的 UTF-8 编码（星期 + 一/二/三/四/五/六/日）
+static const char *kWeekNames[7] = {
+    "\xe6\x98\x9f\xe6\x9c\x9f\xe6\x97\xa5",  // 星期日 (weekday=0)
+    "\xe6\x98\x9f\xe6\x9c\x9f\xe4\xb8\x80",  // 星期一
+    "\xe6\x98\x9f\xe6\x9c\x9f\xe4\xba\x8c",  // 星期二
+    "\xe6\x98\x9f\xe6\x9c\x9f\xe4\xb8\x89",  // 星期三
+    "\xe6\x98\x9f\xe6\x9c\x9f\xe5\x9b\x9b",  // 星期四
+    "\xe6\x98\x9f\xe6\x9c\x9f\xe4\xba\x94",  // 星期五
+    "\xe6\x98\x9f\xe6\x9c\x9f\xe5\x85\xad",  // 星期六
+};
+
+static uint8_t s_lastMinute = 0xFF;
+static uint8_t s_lastDay    = 0xFF;
+
+void drawTime(const RTCTime &t) {
+    char timeBuf[8];
+    snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", t.hour, t.minute);
+    gui.fillRect(kTimeX, kTimeY, kTimeStrLen * kTimeCharW, kTimeCharH, ColorWhite);
+    gui.drawBigDigits(kTimeX, kTimeY, timeBuf, ColorBlack);
+}
+
+void drawDateWeek(const RTCTime &t) {
+    // 日期字符串 "MM/DD"，用 drawSmallDigits（24x32）
+    char dateBuf[8];
+    snprintf(dateBuf, sizeof(dateBuf), "%02d/%02d", t.month, t.day);
+
+    // 日期总宽 = 5字符 × 24px = 120px，右对齐
+    int dateW = 5 * 24;
+    int dateX = 400 - dateW - kDateRightMargin;
+
+    // 星期总宽 = 3汉字 × 16px = 48px，右对齐
+    int weekW = 3 * 16;
+    int weekX = 400 - weekW - kDateRightMargin;
+
+    // 清除日期/星期区域（取两行中较宽的）
+    int clearW = (dateW > weekW) ? dateW : weekW;
+    int clearX = 400 - clearW - kDateRightMargin;
+    int clearH = 32 + 4 + 16 + 4;  // 日期行高 + 间距 + 星期行高 + 下边距
+    gui.fillRect(clearX, kDateY - 2, clearW + 2, clearH, ColorWhite);
+
+    // 绘制日期
+    gui.drawSmallDigits(dateX, kDateY, dateBuf, ColorBlack);
+
+    // 绘制星期（中文，16x16）
+    uint8_t wd = t.weekday < 7 ? t.weekday : 0;
+    gui.drawUTF8String(weekX, kWeekY, kWeekNames[wd], ColorBlack);
+}
+
 void loop() {
-    // 读取并打印当前时间
     RTCTime now = rtc.now();
-    
-    // 闹钟监听器
     rtc.alarmListener();
-    
+
+    // 时间：每分钟刷新一次
+    if (now.minute != s_lastMinute) {
+        drawTime(now);
+        s_lastMinute = now.minute;
+    }
+
+    // 日期/星期：每天刷新一次（也在首次进入时刷新）
+    if (now.day != s_lastDay) {
+        drawDateWeek(now);
+        s_lastDay = now.day;
+    }
+
     // ===================== SHTC3 读取温湿度 =====================
     sensors_event_t humidity, temp;
-    
-    // 读取传感器数据
     shtc3.getEvent(&humidity, &temp);
-    
-    // 打印温度数据（保留1位小数）
-    Serial.print("温度: ");
-    Serial.print(temp.temperature, 1);
-    Serial.println(" °C");
-    
-    // 打印湿度数据（保留1位小数）
-    Serial.print("湿度: ");
-    Serial.print(humidity.relative_humidity, 1);
-    Serial.println(" %");
-    
-    Serial.println("----------------------------");
-    
-    // 延迟 2 秒
-    vTaskDelay(pdMS_TO_TICKS(2000));
+
+    Serial.printf("温度: %.1f °C  湿度: %.1f %%\n",
+                  temp.temperature, humidity.relative_humidity);
+
+    // ===================== 在屏幕底部显示温湿度 =====================
+    char tempStr[16];
+    snprintf(tempStr, sizeof(tempStr), "%.1fC", temp.temperature);
+
+    char humidStr[16];
+    snprintf(humidStr, sizeof(humidStr), "%.1f%%", humidity.relative_humidity);
+
+    int tempY  = 300 - 32 - 20;
+    int humidY = tempY;
+    int humidX = 400 - (int)strlen(humidStr) * 24 - 20;
+
+    gui.fillRect(0, tempY - 5, 400, 32 + 10, ColorWhite);
+    gui.drawSmallDigits(20, tempY, tempStr, ColorBlack);
+    gui.drawSmallDigits(humidX, humidY, humidStr, ColorBlack);
+
+    gui.display();
+
+    vTaskDelay(pdMS_TO_TICKS(1000));
 }
