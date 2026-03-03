@@ -9,6 +9,7 @@
 #include <freertos/task.h>
 #include <freertos/queue.h>
 #include "app_message.h"
+#include "fonts/pkBitmap.h"
 
 #define ENABLE_GUI_TESTS 0
 
@@ -237,8 +238,11 @@ void setup() {
     // 配置单色前景/背景色
     gui.setForegroundColor(ColorBlack);
     gui.setBackgroundColor(ColorWhite);
-
     gui.clear();
+
+    // 测试显示 pkBitmap 位图
+    gui.drawBitmap(0, 0, PK_BITMAP_WIDTH, PK_BITMAP_HEIGHT, gImage_out, ColorBlack);
+    gui.display();
 
 #if ENABLE_GUI_TESTS
     GuiTests::runAllTests(gui);
@@ -248,6 +252,7 @@ void setup() {
 
     // ===================== RTC 初始化 =====================
     // PCF85063 接线：SDA=GPIO13, SCL=GPIO14
+#if ENABLE_GUI_TESTS
     rtc.begin(13, 14);
 
     // 设置一个默认时间（如果 NTP 同步失败会使用这个时间）
@@ -295,10 +300,14 @@ void setup() {
     xTaskCreate(rtcTask, "rtcTask", 2048, nullptr, 2, nullptr);
     xTaskCreate(humitureTask, "humTask", 2048, nullptr, 1, nullptr);
     xTaskCreate(wifiTask, "wifiTask", 8192, nullptr, 2, nullptr);
+#endif
+
 }
 
 // 主线程：作为 UI Looper，只处理消息并更新界面
 void loop() {
+
+#if ENABLE_GUI_TESTS
     if (g_msgQueue == nullptr) {
         vTaskDelay(pdMS_TO_TICKS(100));
         return;
@@ -380,4 +389,6 @@ void loop() {
     } else {
         // 超时分支：当前没有消息，可在此添加轻量级空闲逻辑（目前留空）
     }
+#endif
+
 }
