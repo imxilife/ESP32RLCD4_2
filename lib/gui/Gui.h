@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "display_bsp.h"   // 里面有 DisplayPort 和 ColorBlack/ColorWhite
-#include "GlyphEffect.h"
+#include <display_bsp.h>
+#include "effects/GlyphEffect.h"
 
 #ifndef ESP32_RLCD4_2_GUI_H
 #define ESP32_RLCD4_2_GUI_H

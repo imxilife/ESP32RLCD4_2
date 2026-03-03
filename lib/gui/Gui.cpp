@@ -3,10 +3,10 @@
 //
 
 #include "Gui.h"
-#include "Font5x7.h"
-#include "FontDigits.h"
-#include "GlyphEffect.h"
-#include "chinese_font.h"
+#include "fonts/Font5x7.h"
+#include "fonts/FontDigits.h"
+#include "effects/GlyphEffect.h"
+#include "fonts/chinese_font.h"
 
 #include <stdlib.h>
 #include <stdint.h>
