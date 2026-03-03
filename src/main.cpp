@@ -107,18 +107,20 @@ void setup() {
     gui.clear();
 #endif
 
-    // ===================== WiFi 初始化 =====================
-    wifiConfig.begin();
-
     // ===================== RTC 初始化 =====================
     // PCF85063 接线：SDA=GPIO13, SCL=GPIO14
     rtc.begin(13, 14);
 
+    // 设置一个默认时间（如果 NTP 同步失败会使用这个时间）
     rtc.setTime(2026, 3, 2, 23, 34, 0, 1);
     delay(100);
 
     RTCTime now = rtc.now();
     rtc.setAlarm(10, 3, onAlarmTriggered);
+
+    // ===================== WiFi 初始化 + NTP 时间同步 =====================
+    // WiFi 连接成功后会自动进行 NTP 时间同步并更新 RTC
+    wifiConfig.begin(&rtc);
 
     // ===================== 温湿度传感器初始化 =====================
     Serial.println("\n=== SHTC3 Temperature & Humidity Sensor Test ===");
