@@ -5,6 +5,10 @@
 #include <Humiture.h>
 #include <GuiTests.h>
 #include <WiFiConfig.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <freertos/queue.h>
+#include "app_message.h"
 
 #define ENABLE_GUI_TESTS 0
 
@@ -17,8 +21,15 @@ RTC85063 rtc;
 // 全局温湿度传感器实例
 Humiture humiture;
 
-// WiFi 配置实例
-WiFiConfig wifiConfig(&gui);
+// WiFi 配置实例（不再直接持有 GUI）
+WiFiConfig wifiConfig;
+
+// 应用消息队列（主 loop 作为 UI 事件循环）
+static QueueHandle_t g_msgQueue = nullptr;
+
+// 触摸与按键引脚（占位，按实际硬件修改）
+static constexpr int kTouchIntPin  = -1; // TODO: 设置为真实触摸中断引脚
+static constexpr int kButtonIntPin = -1; // TODO: 设置为真实按键中断引脚
 
 // 闹钟回调函数
 void onAlarmTriggered() {
@@ -53,6 +64,16 @@ static const char *kWeekNames[7] = {
 
 static uint8_t s_lastMinute = 0xFF;
 static uint8_t s_lastDay    = 0xFF;
+
+// ── RTOS Task 前置声明 ─────────────────────────────────────────────
+void rtcTask(void* pvParameters);
+void humitureTask(void* pvParameters);
+void wifiTask(void* pvParameters);
+
+// ── 中断服务函数前置声明 ─────────────────────────────────────────
+void IRAM_ATTR onTouchISR();
+void IRAM_ATTR onButtonISR();
+void wifiUiMessageHandler(const char* line1, const char* line2);
 
 // 绘制时间
 void drawTime(const RTCTime &t) {
@@ -90,6 +111,124 @@ void drawDateWeek(const RTCTime &t) {
     gui.drawUTF8String(weekX, kWeekY, kWeekNames[wd], ColorBlack);
 }
 
+// ===================== RTOS Tasks =====================
+
+void rtcTask(void* pvParameters) {
+    (void)pvParameters;
+    while (true) {
+        RTCTime now = rtc.now();
+        rtc.alarmListener();
+
+        if (g_msgQueue != nullptr) {
+            AppMessage msg;
+            msg.type    = MSG_RTC_UPDATE;
+            msg.rtcTime = now;
+            xQueueSend(g_msgQueue, &msg, 0);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
+void humitureTask(void* pvParameters) {
+    (void)pvParameters;
+    while (true) {
+        float temperature, humidity;
+        if (humiture.read(temperature, humidity)) {
+            if (g_msgQueue != nullptr) {
+                AppMessage msg;
+                msg.type          = MSG_HUMITURE_UPDATE;
+                msg.humiture.temp = temperature;
+                msg.humiture.hum  = humidity;
+                xQueueSend(g_msgQueue, &msg, 0);
+            }
+        }
+        vTaskDelay(pdMS_TO_TICKS(30000)); // 每 30 秒读取一次
+    }
+}
+
+void wifiTask(void* pvParameters) {
+    (void)pvParameters;
+
+    // 在专门的 WiFi Task 中执行阻塞式配网与 NTP，同步完成后再进入状态监控
+    wifiConfig.begin(&rtc);
+
+    bool lastConnected = wifiConfig.isConnected();
+
+    // 上报一次当前状态
+    if (g_msgQueue != nullptr) {
+        AppMessage msg;
+        msg.type           = MSG_WIFI_STATUS;
+        msg.wifi.connected = lastConnected;
+        xQueueSend(g_msgQueue, &msg, 0);
+    }
+
+    while (true) {
+        bool connected = wifiConfig.isConnected();
+        if (connected != lastConnected && g_msgQueue != nullptr) {
+            AppMessage msg;
+            msg.type           = MSG_WIFI_STATUS;
+            msg.wifi.connected = connected;
+            xQueueSend(g_msgQueue, &msg, 0);
+            lastConnected = connected;
+        }
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+}
+
+// ===================== 外部中断 ISR =====================
+
+void IRAM_ATTR onTouchISR() {
+    if (g_msgQueue == nullptr) return;
+
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    AppMessage msg;
+    msg.type    = MSG_TOUCH_EVENT;
+    msg.touch.x = 0; // TODO: 根据触摸芯片读取真实坐标
+    msg.touch.y = 0;
+
+    xQueueSendFromISR(g_msgQueue, &msg, &xHigherPriorityTaskWoken);
+    if (xHigherPriorityTaskWoken == pdTRUE) {
+        portYIELD_FROM_ISR();
+    }
+}
+
+void IRAM_ATTR onButtonISR() {
+    if (g_msgQueue == nullptr) return;
+
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    AppMessage msg;
+    msg.type         = MSG_BUTTON_EVENT;
+    msg.button.btnId = 0; // TODO: 区分不同按键
+
+    xQueueSendFromISR(g_msgQueue, &msg, &xHigherPriorityTaskWoken);
+    if (xHigherPriorityTaskWoken == pdTRUE) {
+        portYIELD_FROM_ISR();
+    }
+}
+
+// WiFiConfig 文本提示回调：将其转换为 WiFi UI 消息投入队列
+void wifiUiMessageHandler(const char* line1, const char* line2) {
+    if (g_msgQueue == nullptr) {
+        return;
+    }
+
+    AppMessage msg;
+    msg.type = MSG_WIFI_UI;
+
+    // 安全拷贝字符串到固定大小缓冲区
+    memset(msg.wifiUi.line1, 0, WIFI_UI_LINE_MAX);
+    memset(msg.wifiUi.line2, 0, WIFI_UI_LINE_MAX);
+    if (line1 != nullptr) {
+        strncpy(msg.wifiUi.line1, line1, WIFI_UI_LINE_MAX - 1);
+    }
+    if (line2 != nullptr) {
+        strncpy(msg.wifiUi.line2, line2, WIFI_UI_LINE_MAX - 1);
+    }
+
+    xQueueSend(g_msgQueue, &msg, 0);
+}
+
 void setup() {
 
     Serial.begin(115200);
@@ -112,15 +251,17 @@ void setup() {
     rtc.begin(13, 14);
 
     // 设置一个默认时间（如果 NTP 同步失败会使用这个时间）
-    rtc.setTime(2026, 3, 2, 23, 34, 0, 1);
+    rtc.setTime(2026, 01, 01, 0, 59, 59, 1);
     delay(100);
 
+    // 预读一次当前时间，初始化显示
     RTCTime now = rtc.now();
-    rtc.setAlarm(10, 3, onAlarmTriggered);
+    drawTime(now);
+    drawDateWeek(now);
+    s_lastMinute = now.minute;
+    s_lastDay    = now.day;
 
-    // ===================== WiFi 初始化 + NTP 时间同步 =====================
-    // WiFi 连接成功后会自动进行 NTP 时间同步并更新 RTC
-    wifiConfig.begin(&rtc);
+    rtc.setAlarm(10, 3, onAlarmTriggered);
 
     // ===================== 温湿度传感器初始化 =====================
     Serial.println("\n=== SHTC3 Temperature & Humidity Sensor Test ===");
@@ -129,52 +270,114 @@ void setup() {
         Serial.println("温湿度传感器初始化失败！");
         while (1) delay(10);
     }
+
+    // ===================== 创建消息队列 =====================
+    g_msgQueue = xQueueCreate(16, sizeof(AppMessage));
+    if (g_msgQueue == nullptr) {
+        Serial.println("创建消息队列失败！系统无法继续运行");
+        while (1) delay(100);
+    }
+
+    // 设置 WiFi 文本提示回调，将 WiFiConfig 内部状态提示转为队列消息
+    wifiConfig.setMessageCallback(wifiUiMessageHandler);
+
+    // ===================== 注册外部中断（如有实际引脚） =====================
+    if (kTouchIntPin >= 0) {
+        pinMode(kTouchIntPin, INPUT_PULLUP);
+        attachInterrupt(digitalPinToInterrupt(kTouchIntPin), onTouchISR, FALLING);
+    }
+    if (kButtonIntPin >= 0) {
+        pinMode(kButtonIntPin, INPUT_PULLUP);
+        attachInterrupt(digitalPinToInterrupt(kButtonIntPin), onButtonISR, FALLING);
+    }
+
+    // ===================== 创建后台任务 =====================
+    xTaskCreate(rtcTask, "rtcTask", 2048, nullptr, 2, nullptr);
+    xTaskCreate(humitureTask, "humTask", 2048, nullptr, 1, nullptr);
+    xTaskCreate(wifiTask, "wifiTask", 8192, nullptr, 2, nullptr);
 }
 
+// 主线程：作为 UI Looper，只处理消息并更新界面
 void loop() {
-    RTCTime now = rtc.now();
-    rtc.alarmListener();
-
-    // 时间：每分钟刷新一次
-    if (now.minute != s_lastMinute) {
-        drawTime(now);
-        s_lastMinute = now.minute;
+    if (g_msgQueue == nullptr) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+        return;
     }
 
-    // 日期/星期：每天刷新一次（也在首次进入时刷新）
-    if (now.day != s_lastDay) {
-        drawDateWeek(now);
-        s_lastDay = now.day;
-    }
+    AppMessage msg;
+    // 等待任意模块投递的 UI 消息（带超时，便于未来空闲逻辑扩展）
+    if (xQueueReceive(g_msgQueue, &msg, pdMS_TO_TICKS(100)) == pdTRUE) {
+        switch (msg.type) {
+        case MSG_RTC_UPDATE: {
+            const RTCTime &t = msg.rtcTime;
+            // 时间：每分钟刷新一次
+            if (t.minute != s_lastMinute) {
+                drawTime(t);
+                s_lastMinute = t.minute;
+            }
+            // 日期/星期：每天刷新一次
+            if (t.day != s_lastDay) {
+                drawDateWeek(t);
+                s_lastDay = t.day;
+            }
+            break;
+        }
+        case MSG_HUMITURE_UPDATE: {
+            float temperature = msg.humiture.temp;
+            float humidity    = msg.humiture.hum;
+            Serial.printf("温度: %.1f °C  湿度: %.1f %%\n", temperature, humidity);
 
-    // ===================== 读取温湿度 =====================
-    float temperature, humidity;
-    if (humiture.read(temperature, humidity)) {
-        Serial.printf("温度: %.1f °C  湿度: %.1f %%\n", temperature, humidity);
+            // ===================== 在屏幕底部显示温湿度 =====================
+            char tempStr[16];
+            snprintf(tempStr, sizeof(tempStr), "%.1fC", temperature);
 
-        // ===================== 在屏幕底部显示温湿度 =====================
-        char tempStr[16];
-        snprintf(tempStr, sizeof(tempStr), "%.1fC", temperature);
+            char humidStr[16];
+            snprintf(humidStr, sizeof(humidStr), "%.1f%%", humidity);
 
-        char humidStr[16];
-        snprintf(humidStr, sizeof(humidStr), "%.1f%%", humidity);
+            int tempY  = 300 - 32 - 20;
+            int humidY = tempY;
+            int humidX = 400 - (int)strlen(humidStr) * 24 - 20;
 
-        int tempY  = 300 - 32 - 20;
-        int humidY = tempY;
-        int humidX = 400 - (int)strlen(humidStr) * 24 - 20;
+            gui.fillRect(0, tempY - 5, 400, 32 + 10, ColorWhite);
+            gui.drawSmallDigits(20, tempY, tempStr, ColorBlack);
+            gui.drawSmallDigits(humidX, humidY, humidStr, ColorBlack);
+            break;
+        }
+        case MSG_WIFI_STATUS: {
+            if (!msg.wifi.connected) {
+                Serial.println("WiFi 连接断开");
+            }
+            break;
+        }
+        case MSG_WIFI_UI: {
+            // 在屏幕中部区域显示 WiFi 配网/同步过程的文本提示
+            gui.fillRect(0, 100, 400, 100, ColorWhite);
 
-        gui.fillRect(0, tempY - 5, 400, 32 + 10, ColorWhite);
-        gui.drawSmallDigits(20, tempY, tempStr, ColorBlack);
-        gui.drawSmallDigits(humidX, humidY, humidStr, ColorBlack);
+            if (msg.wifiUi.line1[0] != '\0') {
+                gui.drawUTF8String(10, 110, msg.wifiUi.line1, ColorBlack);
+            }
+            if (msg.wifiUi.line2[0] != '\0') {
+                // 第二行通常是较短的英文/数字，可用小号字体
+                gui.drawSmallDigits(10, 140, msg.wifiUi.line2, ColorBlack);
+            }
+            break;
+        }
+        case MSG_TOUCH_EVENT: {
+            // 这里可以根据触摸坐标触发界面交互
+            Serial.printf("触摸事件: x=%d, y=%d\n", msg.touch.x, msg.touch.y);
+            break;
+        }
+        case MSG_BUTTON_EVENT: {
+            Serial.printf("按键事件: id=%d\n", msg.button.btnId);
+            break;
+        }
+        default:
+            break;
+        }
 
+        // 统一在主线程刷屏，避免多任务并发操作 GUI
         gui.display();
+    } else {
+        // 超时分支：当前没有消息，可在此添加轻量级空闲逻辑（目前留空）
     }
-
-    // ===================== WiFi 状态监控 =====================
-    // 检查 WiFi 连接状态
-    if (!wifiConfig.isConnected()) {
-        Serial.println("WiFi 连接断开");
-    }
-
-    vTaskDelay(pdMS_TO_TICKS(1000));
 }

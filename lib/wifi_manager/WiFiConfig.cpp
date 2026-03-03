@@ -1,7 +1,7 @@
 #include "WiFiConfig.h"
 
 // 静态成员初始化
-Gui* WiFiConfig::staticGui = nullptr;
+WiFiMessageCallback WiFiConfig::staticMessageCallback = nullptr;
 
 // NTP 服务器配置
 const char* WiFiConfig::ntpServer1 = "ntp1.aliyun.com";
@@ -10,8 +10,18 @@ const char* WiFiConfig::ntpServer3 = "0.cn.pool.ntp.org";
 const long WiFiConfig::gmtOffset_sec = 8 * 3600;  // GMT+8 (中国标准时间)
 const int WiFiConfig::daylightOffset_sec = 0;     // 不使用夏令时
 
-WiFiConfig::WiFiConfig(Gui* guiInstance) : gui(guiInstance), wifiConnected(false) {
-    staticGui = guiInstance;
+WiFiConfig::WiFiConfig() : wifiConnected(false), messageCallback(nullptr) {
+}
+
+void WiFiConfig::setMessageCallback(WiFiMessageCallback cb) {
+    messageCallback      = cb;
+    staticMessageCallback = cb;
+}
+
+void WiFiConfig::emitMessage(const char* line1, const char* line2) {
+    if (staticMessageCallback) {
+        staticMessageCallback(line1, line2);
+    }
 }
 
 bool WiFiConfig::begin() {
@@ -21,10 +31,8 @@ bool WiFiConfig::begin() {
 bool WiFiConfig::begin(RTC85063* rtcInstance) {
     Serial.println("\n=== WiFi 初始化 ===");
     
-    // 显示初始化信息
-    gui->fillRect(0, 100, 400, 40, ColorWhite);
-    gui->drawUTF8String(10, 110, "WiFi初始化中...", ColorBlack);
-    gui->display();
+    // 提示：WiFi 初始化中
+    emitMessage("WiFi初始化中...", "");
     
     // 设置回调函数
     wifiManager.setSaveConfigCallback(saveConfigCallback);
@@ -51,19 +59,11 @@ bool WiFiConfig::begin(RTC85063* rtcInstance) {
         Serial.print("IP 地址: ");
         Serial.println(WiFi.localIP());
         wifiConnected = true;
-        
-        // 在屏幕上显示连接成功信息
-        gui->fillRect(0, 100, 400, 60, ColorWhite);
-        gui->drawUTF8String(10, 110, "WiFi已连接", ColorBlack);
-        
-        char ipStr[32];
+
+        // 提示：WiFi 已连接 + IP 信息
+        char ipStr[48];
         snprintf(ipStr, sizeof(ipStr), "IP:%s", WiFi.localIP().toString().c_str());
-        gui->drawSmallDigits(10, 140, ipStr, ColorBlack);
-        gui->display();
-        
-        delay(2000);
-        gui->fillRect(0, 100, 400, 60, ColorWhite);
-        gui->display();
+        emitMessage("WiFi已连接", ipStr);
         
         // 如果提供了 RTC 实例，进行 NTP 时间同步
         if (rtcInstance != nullptr) {
@@ -74,11 +74,9 @@ bool WiFiConfig::begin(RTC85063* rtcInstance) {
     } else {
         Serial.println("WiFi 连接失败");
         wifiConnected = false;
-        
-        // 显示失败信息
-        gui->fillRect(0, 100, 400, 40, ColorWhite);
-        gui->drawUTF8String(10, 110, "WiFi连接失败", ColorBlack);
-        gui->display();
+
+        // 提示：WiFi 连接失败
+        emitMessage("WiFi连接失败", "");
         
         return false;
     }
@@ -92,10 +90,8 @@ bool WiFiConfig::syncNTPToRTC(RTC85063* rtcInstance) {
     
     Serial.println("\n=== NTP 时间同步 ===");
     
-    // 显示同步信息
-    gui->fillRect(0, 100, 400, 40, ColorWhite);
-    gui->drawUTF8String(10, 110, "NTP时间同步中...", ColorBlack);
-    gui->display();
+    // 提示：NTP 时间同步中
+    emitMessage("NTP时间同步中...", "");
     
     // 配置 NTP 服务器
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2, ntpServer3);
@@ -121,15 +117,9 @@ bool WiFiConfig::syncNTPToRTC(RTC85063* rtcInstance) {
     
     if (retryCount >= maxRetries) {
         Serial.println("NTP 时间同步失败：超时");
-        
-        // 显示失败信息
-        gui->fillRect(0, 100, 400, 40, ColorWhite);
-        gui->drawUTF8String(10, 110, "NTP同步失败", ColorBlack);
-        gui->display();
-        
-        delay(2000);
-        gui->fillRect(0, 100, 400, 40, ColorWhite);
-        gui->display();
+
+        // 提示：NTP 同步失败
+        emitMessage("NTP同步失败", "");
         
         return false;
     }
@@ -157,20 +147,12 @@ bool WiFiConfig::syncNTPToRTC(RTC85063* rtcInstance) {
     );
     
     Serial.println("时间已写入 RTC");
-    
-    // 显示同步成功信息
-    gui->fillRect(0, 100, 400, 60, ColorWhite);
-    gui->drawUTF8String(10, 110, "NTP同步成功", ColorBlack);
-    
+
+    // 提示：NTP 同步成功 + 当前时间
     char timeStr[32];
     snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d", 
              timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-    gui->drawSmallDigits(10, 140, timeStr, ColorBlack);
-    gui->display();
-    
-    delay(2000);
-    gui->fillRect(0, 100, 400, 60, ColorWhite);
-    gui->display();
+    emitMessage("NTP同步成功", timeStr);
     
     return true;
 }
@@ -195,14 +177,9 @@ void WiFiConfig::reset() {
 // WiFi 配置保存回调
 void WiFiConfig::saveConfigCallback() {
     Serial.println("WiFi 配置已保存");
-    
-    if (staticGui) {
-        // 在屏幕上显示保存成功信息
-        staticGui->fillRect(0, 100, 400, 60, ColorWhite);
-        staticGui->drawUTF8String(10, 110, "配置已保存", ColorBlack);
-        staticGui->drawUTF8String(10, 140, "正在连接...", ColorBlack);
-        staticGui->display();
-    }
+
+    // 提示：配置已保存，正在连接
+    emitMessage("配置已保存", "正在连接...");
 }
 
 // WiFi 配置门户启动回调（进入配网模式时调用）
@@ -212,18 +189,9 @@ void WiFiConfig::configModeCallback(WiFiManager *myWiFiManager) {
     Serial.println(WiFi.softAPSSID());
     Serial.print("配置门户 IP: ");
     Serial.println(WiFi.softAPIP());
-    
-    if (staticGui) {
-        // 在屏幕上显示配置信息
-        staticGui->fillRect(0, 100, 400, 100, ColorWhite);
-        staticGui->drawUTF8String(10, 110, "WiFi配置模式", ColorBlack);
-        
-        char apInfo[64];
-        snprintf(apInfo, sizeof(apInfo), "AP:%s", WiFi.softAPSSID().c_str());
-        staticGui->drawSmallDigits(10, 140, apInfo, ColorBlack);
-        
-        staticGui->drawSmallDigits(10, 170, "IP:192.168.4.1", ColorBlack);
-        
-        staticGui->display();
-    }
+
+    // 提示：进入 WiFi 配置模式 + AP 信息
+    char apInfo[64];
+    snprintf(apInfo, sizeof(apInfo), "AP:%s", WiFi.softAPSSID().c_str());
+    emitMessage("WiFi配置模式", apInfo);
 }
