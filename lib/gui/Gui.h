@@ -96,17 +96,6 @@ public:
     /// 获取当前字体
     const Font *currentFont() const;
 
-    // === 文本（前景/背景色可选） ===
-
-    /// 使用显式前景色（透明背景）画单个 ASCII 字符
-    void drawChar(int x, int y, char c, uint8_t color);
-
-    /// 使用当前前景/背景色画单个 ASCII 字符（会覆盖整个字符单元背景）
-    void drawChar(int x, int y, char c);
-
-    /// 使用显式前景/背景色画单个 ASCII 字符（会覆盖整个字符单元背景）
-    void drawChar(int x, int y, char c, uint8_t fgColor, uint8_t bgColor);
-
     // --- 使用当前字体（setFont 设置）---
 
     /// 使用当前字体 + 显式前景色（透明背景）绘制 UTF-8 字符串，自动换行
@@ -129,30 +118,13 @@ public:
     /// 使用指定字体 + 显式前景/背景色绘制 UTF-8 字符串，自动换行
     void drawText(int x, int y, const char *utf8, const Font *font, uint8_t fgColor, uint8_t bgColor);
 
-    /// 使用大号 72x96 数字字体画字符串（仅支持 0-9、':'、'.'），显式前景色
-    void drawBigDigits(int x, int y, const char *text, uint8_t color);
-
-    /// 使用大号 72x96 数字字体画字符串，当前前景/背景色
-    void drawBigDigits(int x, int y, const char *text);
-
-    /// 使用大号 72x96 数字字体画字符串，显式前景/背景色
-    void drawBigDigits(int x, int y, const char *text, uint8_t fgColor, uint8_t bgColor);
-
     /// 设置大号数字效果参数（加粗、描边），修改后影响后续 drawBigDigits
     void setBigDigitEffectParams(const BigDigitEffectParams &params);
+
     void setBigDigitEffectParams(int boldLevel, int outlineWidth = 0);
 
     /// 获取当前大号数字效果参数
     const BigDigitEffectParams &bigDigitEffectParams() const;
-
-    /// 使用小号 24x32 数字字体画字符串（仅支持 0-9、':'、'.'），显式前景色
-    void drawSmallDigits(int x, int y, const char *text, uint8_t color);
-
-    /// 使用小号 24x32 数字字体画字符串，当前前景/背景色
-    void drawSmallDigits(int x, int y, const char *text);
-
-    /// 使用小号 24x32 数字字体画字符串，显式前景/背景色
-    void drawSmallDigits(int x, int y, const char *text, uint8_t fgColor, uint8_t bgColor);
 
     // === 位图 ===
 

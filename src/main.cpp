@@ -85,7 +85,7 @@ void drawTime(const RTCTime &t) {
     char timeBuf[8];
     snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", t.hour, t.minute);
     gui.fillRect(kTimeX, kTimeY, kTimeStrLen * kTimeCharW, kTimeCharH, ColorWhite);
-    gui.drawBigDigits(kTimeX, kTimeY, timeBuf, ColorBlack);
+    //gui.drawBigDigits(kTimeX, kTimeY, timeBuf, ColorBlack);
 }
 
 // 绘制日期和星期
@@ -109,7 +109,7 @@ void drawDateWeek(const RTCTime &t) {
     gui.fillRect(clearX, kDateY - 2, clearW + 2, clearH, ColorWhite);
 
     // 绘制日期
-    gui.drawSmallDigits(dateX, kDateY, dateBuf, ColorBlack);
+    //gui.drawSmallDigits(dateX, kDateY, dateBuf, ColorBlack);
 
     // 绘制星期（中文，16x16）
     uint8_t wd = t.weekday < 7 ? t.weekday : 0;
