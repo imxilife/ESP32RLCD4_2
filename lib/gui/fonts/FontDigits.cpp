@@ -103,3 +103,37 @@ const uint8_t *FontSmall24x32_GetGlyph(char ch, int &width, int &height, int &st
     strideBytes = kFontSmall24x32_Stride;
     return kFontSmall24x32_Glyphs[idx];
 }
+
+// ── Font 适配器 ─────────────────────────────────────────────
+
+const uint8_t *FontBig72x96_GetGlyphFn(uint32_t codepoint,
+                                        int &w, int &h, int &strideBytes,
+                                        int &advanceX, const void * /*data*/) {
+    if (codepoint >= 128) return nullptr;
+    const uint8_t *g = FontBig72x96_GetGlyph(static_cast<char>(codepoint), w, h, strideBytes);
+    advanceX = w;
+    return g;
+}
+
+const uint8_t *FontSmall24x32_GetGlyphFn(uint32_t codepoint,
+                                          int &w, int &h, int &strideBytes,
+                                          int &advanceX, const void * /*data*/) {
+    if (codepoint >= 128) return nullptr;
+    const uint8_t *g = FontSmall24x32_GetGlyph(static_cast<char>(codepoint), w, h, strideBytes);
+    advanceX = w;
+    return g;
+}
+
+const Font kFont_BigDigit = {
+    /* lineHeight */ 96,
+    /* getGlyph   */ FontBig72x96_GetGlyphFn,
+    /* data       */ nullptr,
+    /* fallback   */ nullptr,
+};
+
+const Font kFont_SmallDigit = {
+    /* lineHeight */ 32,
+    /* getGlyph   */ FontSmall24x32_GetGlyphFn,
+    /* data       */ nullptr,
+    /* fallback   */ nullptr,
+};

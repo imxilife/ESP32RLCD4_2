@@ -112,3 +112,29 @@ const uint8_t *ChineseFont_GetGlyph(uint32_t codepoint, int &width, int &height,
     }
     return glyph;
 }
+
+// ── Font 适配器 ─────────────────────────────────────────────
+
+const uint8_t *ChineseFont_GetGlyphFn(uint32_t codepoint,
+                                       int &w, int &h, int &strideBytes,
+                                       int &advanceX, const void * /*data*/) {
+    const uint8_t *g = ChineseFont_GetGlyph(codepoint, w, h, strideBytes);
+    advanceX = w;
+    return g;
+}
+
+const Font kFont_Chinese16x16 = {
+    /* lineHeight */ 16,
+    /* getGlyph   */ ChineseFont_GetGlyphFn,
+    /* data       */ nullptr,
+    /* fallback   */ nullptr,
+};
+
+// 中英混排：中文 16x16，找不到时回退到 ASCII 5x7
+extern const Font kFont_ASCII5x7;  // 定义在 Font5x7.cpp
+const Font kFont_Mixed = {
+    /* lineHeight */ 16,
+    /* getGlyph   */ ChineseFont_GetGlyphFn,
+    /* data       */ nullptr,
+    /* fallback   */ &kFont_ASCII5x7,
+};

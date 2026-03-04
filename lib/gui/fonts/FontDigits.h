@@ -13,3 +13,15 @@ const uint8_t *FontBig72x96_GetGlyph(char ch, int &width, int &height, int &stri
 
 // 返回小号 24x32 字体点阵（1bpp，行主序，strideBytes = (width+7)/8 = 3）
 const uint8_t *FontSmall24x32_GetGlyph(char ch, int &width, int &height, int &strideBytes);
+
+// Font 适配器
+#include "../Font.h"
+const uint8_t *FontBig72x96_GetGlyphFn(uint32_t codepoint,
+                                        int &w, int &h, int &strideBytes,
+                                        int &advanceX, const void *data);
+const uint8_t *FontSmall24x32_GetGlyphFn(uint32_t codepoint,
+                                          int &w, int &h, int &strideBytes,
+                                          int &advanceX, const void *data);
+
+extern const Font kFont_BigDigit;    // 72x96 大号数字
+extern const Font kFont_SmallDigit;  // 24x32 小号数字

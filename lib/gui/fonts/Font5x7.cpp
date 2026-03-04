@@ -51,3 +51,33 @@ const uint8_t *Font5x7_GetGlyph(unsigned char c) {
     }
     return kFont5x7Full[c - 0x20];
 }
+
+// 列主序 → 行主序 1bpp 转换缓冲（7 行 × 1 字节，stride=1）
+static uint8_t s_font5x7RowBuf[7];
+
+const uint8_t *Font5x7_GetGlyphFn(uint32_t codepoint,
+                                   int &w, int &h, int &strideBytes,
+                                   int &advanceX, const void * /*data*/) {
+    if (codepoint < 0x20 || codepoint > 0x7E) {
+        return nullptr;
+    }
+    const uint8_t *src = kFont5x7Full[codepoint - 0x20];
+    // 将列主序（bitmap[col] & (1<<row)）转为行主序（s_buf[row] bit(7-col)）
+    for (int row = 0; row < 7; ++row) {
+        s_font5x7RowBuf[row] = 0;
+        for (int col = 0; col < 5; ++col) {
+            if (src[col] & (1U << row)) {
+                s_font5x7RowBuf[row] |= (1U << (7 - col));
+            }
+        }
+    }
+    w = 5; h = 7; strideBytes = 1; advanceX = 6;
+    return s_font5x7RowBuf;
+}
+
+const Font kFont_ASCII5x7 = {
+    /* lineHeight */ 8,
+    /* getGlyph   */ Font5x7_GetGlyphFn,
+    /* data       */ nullptr,
+    /* fallback   */ nullptr,
+};

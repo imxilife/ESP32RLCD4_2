@@ -84,6 +84,7 @@ Gui::Gui(DisplayPort *lcd, int width, int height)
       fgColor_(ColorBlack),
       bgColor_(ColorWhite),
       chineseGlyphProvider_(nullptr),
+      currentFont_(&kFont_Mixed),
       bigDigitEffect_(BigDigitEffectParamsDefault()) {}
 
 void Gui::clear(uint8_t color) {
@@ -430,6 +431,16 @@ void Gui::fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint8_t c
     }
 }
 
+void Gui::setFont(const Font *font) {
+    if (font) {
+        currentFont_ = font;
+    }
+}
+
+const Font *Gui::currentFont() const {
+    return currentFont_;
+}
+
 void Gui::drawChar(int x, int y, char c, uint8_t color) {
     // 可打印 ASCII 0x20~0x7E 使用 5x7 点阵，不可打印字符画成小方框
     const uint8_t *bitmap = Font5x7_GetGlyph(static_cast<unsigned char>(c));
@@ -468,131 +479,103 @@ void Gui::drawChar(int x, int y, char c, uint8_t fgColor, uint8_t bgColor) {
     }
 }
 
-void Gui::drawString(int x, int y, const char *str, uint8_t color) {
-    if (!str) {
-        return;
-    }
-    int cursorX = x;
-    while (*str) {
-        drawChar(cursorX, y, *str, color);
-        // 字符宽度固定为 6 像素（5 像素点阵 + 1 像素间隔）
-        cursorX += 6;
-        ++str;
-    }
-}
+// ── 核心渲染实现 ─────────────────────────────────────────────────────────────
 
-void Gui::drawString(int x, int y, const char *str) {
-    drawString(x, y, str, fgColor_, bgColor_);
-}
-
-void Gui::drawString(int x, int y, const char *str, uint8_t fgColor, uint8_t bgColor) {
-    if (!str) {
-        return;
-    }
-    int cursorX = x;
-    while (*str) {
-        drawChar(cursorX, y, *str, fgColor, bgColor);
-        cursorX += 6;
-        ++str;
-    }
-}
-
-void Gui::drawUTF8String(int x, int y, const char *utf8, uint8_t color) {
-    if (!utf8) {
+void Gui::drawTextImpl(int x, int y, const char *utf8, const Font *font,
+                       uint8_t fgColor, bool hasBg, uint8_t bgColor) {
+    if (!utf8 || !font) {
         return;
     }
 
     int cursorX = x;
+    int cursorY = y;
+    int lineHeight = font->lineHeight > 0 ? font->lineHeight : 8;
+
     const char *p = utf8;
     uint32_t codepoint = 0;
     while (DecodeNextUTF8(p, codepoint)) {
-        if (codepoint < 0x80) {
-            // ASCII，复用 drawChar
-            drawChar(cursorX, y, static_cast<char>(codepoint), color);
-            cursorX += 6;
-        } else {
-            // 非 ASCII，按中文处理：先外部 provider，再内置 世/界/中/文，最后占位符
-            int w = 0;
-            int h = 0;
-            int stride = 0;
-            const uint8_t *glyph = nullptr;
-            if (chineseGlyphProvider_) {
-                glyph = chineseGlyphProvider_(codepoint, w, h, stride);
-            }
-            if (!glyph || w <= 0 || h <= 0 || stride <= 0) {
-                glyph = ChineseFont_GetGlyph(codepoint, w, h, stride);
-            }
+        if (codepoint == '\n') {
+            cursorX = x;
+            cursorY += lineHeight;
+            continue;
+        }
 
-            if (glyph && w > 0 && h > 0 && stride > 0) {
-                drawBitmap(cursorX, y, w, h, glyph, color);
-                cursorX += w;
-            } else {
-                // 默认占位：16x16 方框 + 对角线
-                const int size = 16;
-                drawRect(cursorX, y, size, size, color);
-                drawLine(cursorX, y, cursorX + size - 1, y + size - 1, color);
-                drawLine(cursorX + size - 1, y, cursorX, y + size - 1, color);
-                cursorX += size;
+        // 遍历 fallback 链查找字形
+        int w = 0, h = 0, stride = 0, advanceX = 0;
+        const uint8_t *glyph = nullptr;
+        for (const Font *f = font; f != nullptr; f = f->fallback) {
+            if (f->getGlyph) {
+                glyph = f->getGlyph(codepoint, w, h, stride, advanceX, f->data);
+                if (glyph && w > 0 && h > 0 && stride > 0) {
+                    break;
+                }
             }
         }
-    }
-}
 
-void Gui::drawUTF8String(int x, int y, const char *utf8) {
-    drawUTF8String(x, y, utf8, fgColor_, bgColor_);
-}
-
-void Gui::drawUTF8String(int x, int y, const char *utf8, uint8_t fgColor, uint8_t bgColor) {
-    if (!utf8) {
-        return;
-    }
-
-    int cursorX = x;
-    const char *p = utf8;
-    uint32_t codepoint = 0;
-    while (DecodeNextUTF8(p, codepoint)) {
-        if (codepoint < 0x80) {
-            // ASCII：使用前景/背景色版本，覆盖字符单元
-            drawChar(cursorX, y, static_cast<char>(codepoint), fgColor, bgColor);
-            cursorX += 6;
-        } else {
-            // 非 ASCII：先外部 provider，再内置 世/界/中/文，最后占位符
-            int w = 0;
-            int h = 0;
-            int stride = 0;
-            const uint8_t *glyph = nullptr;
-            if (chineseGlyphProvider_) {
-                glyph = chineseGlyphProvider_(codepoint, w, h, stride);
+        if (glyph && w > 0 && h > 0 && stride > 0) {
+            if (cursorX + advanceX > width_) {
+                cursorX = x;
+                cursorY += lineHeight;
             }
-            if (!glyph || w <= 0 || h <= 0 || stride <= 0) {
-                glyph = ChineseFont_GetGlyph(codepoint, w, h, stride);
-            }
-
-            if (glyph && w > 0 && h > 0 && stride > 0) {
-                // 先填充背景，再按 stride 读点阵画前景
-                fillRect(cursorX, y, w, h, bgColor);
+            if (hasBg) {
+                fillRect(cursorX, cursorY, advanceX, h, bgColor);
                 for (int j = 0; j < h; ++j) {
                     for (int i = 0; i < w; ++i) {
                         int byteIndex = j * stride + (i >> 3);
                         int bitIndex = 7 - (i & 0x7);
-                        uint8_t b = glyph[byteIndex];
-                        if (b & (1U << bitIndex)) {
-                            drawPixel(cursorX + i, y + j, fgColor);
+                        if (glyph[byteIndex] & (1U << bitIndex)) {
+                            drawPixel(cursorX + i, cursorY + j, fgColor);
                         }
                     }
                 }
-                cursorX += w;
             } else {
-                // 默认占位：16x16 方框 + 对角线，使用前景/背景色
-                const int size = 16;
-                fillRect(cursorX, y, size, size, bgColor);
-                drawRect(cursorX, y, size, size, fgColor);
-                drawLine(cursorX, y, cursorX + size - 1, y + size - 1, fgColor);
-                drawLine(cursorX + size - 1, y, cursorX, y + size - 1, fgColor);
-                cursorX += size;
+                drawBitmap(cursorX, cursorY, w, h, glyph, fgColor);
             }
+            cursorX += advanceX;
+        } else {
+            // 所有字体均无此字形：画占位符
+            const int size = 16;
+            if (cursorX + size > width_) {
+                cursorX = x;
+                cursorY += lineHeight;
+            }
+            if (hasBg) {
+                fillRect(cursorX, cursorY, size, size, bgColor);
+            }
+            drawRect(cursorX, cursorY, size, size, fgColor);
+            drawLine(cursorX, cursorY, cursorX + size - 1, cursorY + size - 1, fgColor);
+            drawLine(cursorX + size - 1, cursorY, cursorX, cursorY + size - 1, fgColor);
+            cursorX += size;
         }
     }
+}
+
+// ── 使用当前字体（setFont 设置）的重载 ────────────────────────────────────
+
+void Gui::drawText(int x, int y, const char *utf8, uint8_t color) {
+    drawTextImpl(x, y, utf8, currentFont_, color, false, 0);
+}
+
+void Gui::drawText(int x, int y, const char *utf8) {
+    drawTextImpl(x, y, utf8, currentFont_, fgColor_, false, 0);
+}
+
+void Gui::drawText(int x, int y, const char *utf8, uint8_t fgColor, uint8_t bgColor) {
+    drawTextImpl(x, y, utf8, currentFont_, fgColor, true, bgColor);
+}
+
+// ── 使用显式字体的重载 ────────────────────────────────────────────────────
+
+void Gui::drawText(int x, int y, const char *utf8, const Font *font, uint8_t color) {
+    drawTextImpl(x, y, utf8, font ? font : currentFont_, color, false, 0);
+}
+
+void Gui::drawText(int x, int y, const char *utf8, const Font *font) {
+    drawTextImpl(x, y, utf8, font ? font : currentFont_, fgColor_, false, 0);
+}
+
+void Gui::drawText(int x, int y, const char *utf8, const Font *font, uint8_t fgColor, uint8_t bgColor) {
+    drawTextImpl(x, y, utf8, font ? font : currentFont_, fgColor, true, bgColor);
 }
 
 void Gui::drawBigDigits(int x, int y, const char *text, uint8_t color) {

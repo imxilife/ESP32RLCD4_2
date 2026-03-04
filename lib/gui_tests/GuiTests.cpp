@@ -1,5 +1,8 @@
 #include "GuiTests.h"
 #include <display_bsp.h>
+#include "fonts/Font5x7.h"
+#include "fonts/FontDigits.h"
+#include "fonts/chinese_font.h"
 
 void GuiTests::testBasicShapes(Gui &gui) {
     gui.drawRect(5, 5, 80, 40, gui.foregroundColor());
@@ -25,15 +28,24 @@ void GuiTests::testTriangleAndLines(Gui &gui) {
 }
 
 void GuiTests::testAsciiText(Gui &gui) {
-    gui.drawString(10, 140, "FG only", ColorBlack);
-    gui.drawString(10, 160, "FG/BG text");
-    gui.drawString(10, 180, "Explicit", ColorBlack, ColorWhite);
+    // 使用默认字体（kFont_Mixed）画 ASCII
+    gui.drawText(10, 140, "Hello, World!", ColorBlack);
+    // 显式指定 ASCII 5x7 字体
+    gui.drawText(10, 152, "Font5x7: ABC 123", &kFont_ASCII5x7, ColorBlack);
 }
 
 void GuiTests::testUTF8Text(Gui &gui) {
-    gui.drawUTF8String(10, 200, "Hello \xE4\xB8\x96\xE7\x95\x8C", ColorBlack);
-    gui.drawUTF8String(10, 220, "UTF8 \xE4\xB8\xAD\xE6\x96\x87", ColorBlack, ColorWhite);
-    
+    // 使用 kFont_Mixed：中文走 Chinese16x16，找不到时回退 ASCII 5x7
+    gui.setFont(&kFont_Mixed);
+    gui.drawText(10, 170, "\xE6\x98\x9F\xE6\x9C\x9F\xE4\xB8\x89");  // 星期三
+    gui.drawText(10, 190, "\xE4\xB8\xAD\xE6\x96\x87 Hello 123");       // 中文 Hello 123
+
+    // 显式传 font 参数（中英混排）
+    gui.drawText(10, 210, "\xE6\x98\x9F\xE6\x9C\x9F\xE4\xBA\x94 Fri", &kFont_Mixed, ColorBlack);
+
+    // 显式前/背景色
+    gui.drawText(10, 230, "FG/BG text", &kFont_ASCII5x7, ColorBlack, ColorWhite);
+
     gui.setBigDigitEffectParams(0, 0);
     gui.display();
 }

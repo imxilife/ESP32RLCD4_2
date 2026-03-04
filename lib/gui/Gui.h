@@ -6,6 +6,7 @@
 
 #include <display_bsp.h>
 #include "effects/GlyphEffect.h"
+#include "Font.h"
 
 #ifndef ESP32_RLCD4_2_GUI_H
 #define ESP32_RLCD4_2_GUI_H
@@ -15,14 +16,14 @@
  *
  * 基于 DisplayPort 的单色图形库，接口风格参考 u8g2：
  * - 提供点、线、基本几何图形（矩形、圆、圆角矩形、三角形）绘制；
- * - 提供 ASCII 文本与 UTF-8 文本（含中文）的绘制；
- * - 对单色屏显式区分“前景色”和“背景色”，可按前景/背景覆盖绘制。
+ * - 提供 UTF-8 文本（ASCII + 中文 + 自定义字模）的绘制，支持 setFont/drawText；
+ * - 对单色屏显式区分"前景色"和"背景色"，可按前景/背景覆盖绘制。
  *
  * 所有绘制操作只修改显示缓冲区，真正刷屏由 display() 触发。
  */
 class Gui {
 public:
-    /// 外部中文点阵查找函数：输入 Unicode 码点，返回 1bpp 位图指针及尺寸信息
+    /// @deprecated 保留向后兼容，新代码请改用 setFont / drawText(font)
     typedef const uint8_t *(*ChineseGlyphProvider)(uint32_t codepoint,
                                                    int &width,
                                                    int &height,
@@ -41,10 +42,10 @@ public:
     /// 将缓冲区内容刷到 LCD
     void display();
 
-    /// 设置当前前景色（逻辑上用于“画线/文字/描边”）
+    /// 设置当前前景色（逻辑上用于"画线/文字/描边"）
     void setForegroundColor(uint8_t color);
 
-    /// 设置当前背景色（逻辑上用于“清屏/文字背景/填充区域”）
+    /// 设置当前背景色（逻辑上用于"清屏/文字背景/填充区域"）
     void setBackgroundColor(uint8_t color);
 
     /// 获取当前前景色
@@ -87,6 +88,14 @@ public:
     /// 画实心三角形
     void fillTriangle(int x0, int y0, int x1, int y1, int x2, int y2, uint8_t color);
 
+    // === 字体设置（u8g2 风格） ===
+
+    /// 设置当前字体，影响后续无显式 font 参数的 drawText 调用
+    void setFont(const Font *font);
+
+    /// 获取当前字体
+    const Font *currentFont() const;
+
     // === 文本（前景/背景色可选） ===
 
     /// 使用显式前景色（透明背景）画单个 ASCII 字符
@@ -98,23 +107,27 @@ public:
     /// 使用显式前景/背景色画单个 ASCII 字符（会覆盖整个字符单元背景）
     void drawChar(int x, int y, char c, uint8_t fgColor, uint8_t bgColor);
 
-    /// 使用显式前景色（透明背景）画 ASCII 字符串
-    void drawString(int x, int y, const char *str, uint8_t color);
+    // --- 使用当前字体（setFont 设置）---
 
-    /// 使用当前前景/背景色画 ASCII 字符串（会覆盖字符串区域背景）
-    void drawString(int x, int y, const char *str);
+    /// 使用当前字体 + 显式前景色（透明背景）绘制 UTF-8 字符串，自动换行
+    void drawText(int x, int y, const char *utf8, uint8_t color);
 
-    /// 使用显式前景/背景色画 ASCII 字符串（会覆盖字符串区域背景）
-    void drawString(int x, int y, const char *str, uint8_t fgColor, uint8_t bgColor);
+    /// 使用当前字体 + 当前前景色绘制 UTF-8 字符串，自动换行
+    void drawText(int x, int y, const char *utf8);
 
-    /// 使用显式前景色（透明背景）画 UTF-8 字符串（含中文）
-    void drawUTF8String(int x, int y, const char *utf8, uint8_t color);
+    /// 使用当前字体 + 显式前景/背景色绘制 UTF-8 字符串，自动换行
+    void drawText(int x, int y, const char *utf8, uint8_t fgColor, uint8_t bgColor);
 
-    /// 使用当前前景/背景色画 UTF-8 字符串（会覆盖字符串区域背景）
-    void drawUTF8String(int x, int y, const char *utf8);
+    // --- 使用显式字体（覆盖当前字体）---
 
-    /// 使用显式前景/背景色画 UTF-8 字符串（会覆盖字符串区域背景）
-    void drawUTF8String(int x, int y, const char *utf8, uint8_t fgColor, uint8_t bgColor);
+    /// 使用指定字体 + 显式前景色（透明背景）绘制 UTF-8 字符串，自动换行
+    void drawText(int x, int y, const char *utf8, const Font *font, uint8_t color);
+
+    /// 使用指定字体 + 当前前景色绘制 UTF-8 字符串，自动换行
+    void drawText(int x, int y, const char *utf8, const Font *font);
+
+    /// 使用指定字体 + 显式前景/背景色绘制 UTF-8 字符串，自动换行
+    void drawText(int x, int y, const char *utf8, const Font *font, uint8_t fgColor, uint8_t bgColor);
 
     /// 使用大号 72x96 数字字体画字符串（仅支持 0-9、':'、'.'），显式前景色
     void drawBigDigits(int x, int y, const char *text, uint8_t color);
@@ -132,13 +145,13 @@ public:
     /// 获取当前大号数字效果参数
     const BigDigitEffectParams &bigDigitEffectParams() const;
 
-    /// 使用小号 16x24 数字字体画字符串（仅支持 0-9、':'、'.'），显式前景色
+    /// 使用小号 24x32 数字字体画字符串（仅支持 0-9、':'、'.'），显式前景色
     void drawSmallDigits(int x, int y, const char *text, uint8_t color);
 
-    /// 使用小号 16x24 数字字体画字符串，当前前景/背景色
+    /// 使用小号 24x32 数字字体画字符串，当前前景/背景色
     void drawSmallDigits(int x, int y, const char *text);
 
-    /// 使用小号 16x24 数字字体画字符串，显式前景/背景色
+    /// 使用小号 24x32 数字字体画字符串，显式前景/背景色
     void drawSmallDigits(int x, int y, const char *text, uint8_t fgColor, uint8_t bgColor);
 
     // === 位图 ===
@@ -146,7 +159,7 @@ public:
     /// 画 1bpp 位图（按行从左到右，高位在左），color 表示点亮像素的颜色
     void drawBitmap(int x, int y, int w, int h, const uint8_t *bitmap, uint8_t color);
 
-    // === 中文点阵 ===
+    // === 中文点阵（向后兼容） ===
 
     /// 配置中文点阵提供回调，用于从外部字库取出 1bpp 点阵
     void setChineseGlyphProvider(ChineseGlyphProvider provider);
@@ -160,37 +173,12 @@ private:
     uint8_t bgColor_;  ///< 当前背景色
 
     ChineseGlyphProvider chineseGlyphProvider_;
+    const Font *currentFont_;              ///< 当前字体（setFont 设置）
     BigDigitEffectParams bigDigitEffect_;  ///< 大号数字加粗/描边参数
-};
 
-#endif //ESP32_RLCD4_2_GUI_H
-
-//
-// Created by Kelly on 26-2-12.
-//
-#pragma once
-#include "display_bsp.h"   // 里面有 DisplayPort 和 ColorBlack/ColorWhite
-
-#ifndef ESP32_RLCD4_2_GUI_H
-#define ESP32_RLCD4_2_GUI_H
-
-class Gui {
-public:
-    Gui(DisplayPort *lcd, int width, int height);
-
-    void clear(uint8_t color);                     // 清屏（只改缓冲区，不立刻刷 LCD）
-    void drawPixel(int x, int y, uint8_t color);   // 画点
-    void drawLine(int x0, int y0, int x1, int y1, uint8_t color);  // 画线
-    void drawChar(int x, int y, char c, uint8_t color);            // 画单个字符
-    void drawString(int x, int y, const char *str, uint8_t color); // 画字符串
-    void drawBitmap(int x, int y, int w, int h, const uint8_t *bitmap, uint8_t color); // 显示位图
-
-    void display();   // 调用 LCD 的 RLCD_Display，把缓冲区真正刷到屏幕
-
-private:
-    DisplayPort *lcd_;
-    int width_;
-    int height_;
+    /// 所有 drawText 重载收敛到此：hasBg=false 时透明背景（忽略 bgColor）
+    void drawTextImpl(int x, int y, const char *utf8, const Font *font,
+                      uint8_t fgColor, bool hasBg, uint8_t bgColor);
 };
 
 #endif //ESP32_RLCD4_2_GUI_H
