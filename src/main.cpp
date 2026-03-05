@@ -124,20 +124,20 @@ void testAllFonts() {
     int y = 4;
 
     // 1. kFont_ASCII5x7 — 5x7 ASCII，行高 8
-    gui.drawText(4, y, "ASCII 5x7: Hello 123!@#", &kFont_ASCII5x7, ColorBlack);
+    gui.setFont(&kFont_ASCII5x7);
+    gui.drawText(4, y, "ASCII 5x7: Hello 123!@#");
     y += 12;
 
     // 2. kFont_Mixed — 中英混排：中文 16x16，回退 ASCII 5x7
-    gui.drawText(4, y,
-        "中文Hello 中文123",
-        &kFont_Mixed, ColorBlack);   // 中文 Hello 温度 123
+    gui.setFont(&kFont_Mixed);
+    gui.drawText(4, y, "中文Hello 中文123");
     y += 20;
 
     // 3. kFont_Chinese16x16 单独测试（找不到字时画占位符）
+    gui.setFont(&kFont_Chinese16x16);
     gui.drawText(4, y,
         "\xe6\x98\x9f\xe6\x9c\x9f\xe4\xb8\x89"   // 星期三
-        "\xe6\x98\x9f\xe6\x9c\x9f\xe4\xba\x94",   // 星期五
-        &kFont_Chinese16x16, ColorBlack);
+        "\xe6\x98\x9f\xe6\x9c\x9f\xe4\xba\x94");  // 星期五
     y += 20;
 
     // 4. setFont 风格（u8g2 风格：设置一次，多次调用）
@@ -146,15 +146,18 @@ void testAllFonts() {
     y += 20;    // 温度: 25.3C  湿度: 60%
 
     // 5. kFont_SmallDigit — 24x32 小号数字
-    gui.drawText(4, y, "03/05", &kFont_SmallDigit, ColorBlack);
+    gui.setFont(&kFont_SmallDigit);
+    gui.drawText(4, y, "03/05");
     y += 36;
 
     // 6. kFont_BigDigit — 72x96 大号数字（时间格式）
-    gui.drawText(4, y, "12:34", &kFont_BigDigit, ColorBlack);
+    gui.setFont(&kFont_BigDigit);
+    gui.drawText(4, y, "12:34");
     y += 100;
 
     // 7. kFont_Alibaba72x96 — 阿里巴巴字体数字
-    gui.drawText(4, y, "56:78", &kFont_Alibaba72x96, ColorBlack);
+    gui.setFont(&kFont_Alibaba72x96);
+    gui.drawText(4, y, "56:78");
 
     gui.display();
 }

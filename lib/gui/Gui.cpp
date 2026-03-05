@@ -444,7 +444,7 @@ const Font *Gui::currentFont() const {
 // ── 核心渲染实现 ─────────────────────────────────────────────────────────────
 
 void Gui::drawTextImpl(int x, int y, const char *utf8, const Font *font,
-                       uint8_t fgColor, bool hasBg, uint8_t bgColor) {
+                       uint8_t fgColor, uint8_t bgColor) {
     if (!utf8 || !font) {
         return;
     }
@@ -479,19 +479,15 @@ void Gui::drawTextImpl(int x, int y, const char *utf8, const Font *font,
                 cursorX = x;
                 cursorY += lineHeight;
             }
-            if (hasBg) {
-                fillRect(cursorX, cursorY, advanceX, h, bgColor);
-                for (int j = 0; j < h; ++j) {
-                    for (int i = 0; i < w; ++i) {
-                        int byteIndex = j * stride + (i >> 3);
-                        int bitIndex = 7 - (i & 0x7);
-                        if (glyph[byteIndex] & (1U << bitIndex)) {
-                            drawPixel(cursorX + i, cursorY + j, fgColor);
-                        }
+            fillRect(cursorX, cursorY, advanceX, h, bgColor);
+            for (int j = 0; j < h; ++j) {
+                for (int i = 0; i < w; ++i) {
+                    int byteIndex = j * stride + (i >> 3);
+                    int bitIndex = 7 - (i & 0x7);
+                    if (glyph[byteIndex] & (1U << bitIndex)) {
+                        drawPixel(cursorX + i, cursorY + j, fgColor);
                     }
                 }
-            } else {
-                drawBitmap(cursorX, cursorY, w, h, glyph, fgColor);
             }
             cursorX += advanceX;
         } else {
@@ -501,9 +497,7 @@ void Gui::drawTextImpl(int x, int y, const char *utf8, const Font *font,
                 cursorX = x;
                 cursorY += lineHeight;
             }
-            if (hasBg) {
-                fillRect(cursorX, cursorY, size, size, bgColor);
-            }
+            fillRect(cursorX, cursorY, size, size, bgColor);
             drawRect(cursorX, cursorY, size, size, fgColor);
             drawLine(cursorX, cursorY, cursorX + size - 1, cursorY + size - 1, fgColor);
             drawLine(cursorX + size - 1, cursorY, cursorX, cursorY + size - 1, fgColor);
@@ -512,32 +506,12 @@ void Gui::drawTextImpl(int x, int y, const char *utf8, const Font *font,
     }
 }
 
-// ── 使用当前字体（setFont 设置）的重载 ────────────────────────────────────
-
-void Gui::drawText(int x, int y, const char *utf8, uint8_t color) {
-    drawTextImpl(x, y, utf8, currentFont_, color, false, 0);
-}
-
 void Gui::drawText(int x, int y, const char *utf8) {
-    drawTextImpl(x, y, utf8, currentFont_, fgColor_, false, 0);
+    drawTextImpl(x, y, utf8, currentFont_, fgColor_, bgColor_);
 }
 
 void Gui::drawText(int x, int y, const char *utf8, uint8_t fgColor, uint8_t bgColor) {
-    drawTextImpl(x, y, utf8, currentFont_, fgColor, true, bgColor);
-}
-
-// ── 使用显式字体的重载 ────────────────────────────────────────────────────
-
-void Gui::drawText(int x, int y, const char *utf8, const Font *font, uint8_t color) {
-    drawTextImpl(x, y, utf8, font ? font : currentFont_, color, false, 0);
-}
-
-void Gui::drawText(int x, int y, const char *utf8, const Font *font) {
-    drawTextImpl(x, y, utf8, font ? font : currentFont_, fgColor_, false, 0);
-}
-
-void Gui::drawText(int x, int y, const char *utf8, const Font *font, uint8_t fgColor, uint8_t bgColor) {
-    drawTextImpl(x, y, utf8, font ? font : currentFont_, fgColor, true, bgColor);
+    drawTextImpl(x, y, utf8, currentFont_, fgColor, bgColor);
 }
 
 void Gui::drawBitmap(int x, int y, int w, int h, const uint8_t *bitmap, uint8_t color) {

@@ -29,9 +29,10 @@ void GuiTests::testTriangleAndLines(Gui &gui) {
 
 void GuiTests::testAsciiText(Gui &gui) {
     // 使用默认字体（kFont_Mixed）画 ASCII
-    gui.drawText(10, 140, "Hello, World!", ColorBlack);
+    gui.drawText(10, 140, "Hello, World!");
     // 显式指定 ASCII 5x7 字体
-    gui.drawText(10, 152, "Font5x7: ABC 123", &kFont_ASCII5x7, ColorBlack);
+    gui.setFont(&kFont_ASCII5x7);
+    gui.drawText(10, 152, "Font5x7: ABC 123");
 }
 
 void GuiTests::testUTF8Text(Gui &gui) {
@@ -40,11 +41,12 @@ void GuiTests::testUTF8Text(Gui &gui) {
     gui.drawText(10, 170, "\xE6\x98\x9F\xE6\x9C\x9F\xE4\xB8\x89");  // 星期三
     gui.drawText(10, 190, "\xE4\xB8\xAD\xE6\x96\x87 Hello 123");       // 中文 Hello 123
 
-    // 显式传 font 参数（中英混排）
-    gui.drawText(10, 210, "\xE6\x98\x9F\xE6\x9C\x9F\xE4\xBA\x94 Fri", &kFont_Mixed, ColorBlack);
+    // 中英混排，字体已由上面的 setFont 设置
+    gui.drawText(10, 210, "\xE6\x98\x9F\xE6\x9C\x9F\xE4\xBA\x94 Fri");
 
     // 显式前/背景色
-    gui.drawText(10, 230, "FG/BG text", &kFont_ASCII5x7, ColorBlack, ColorWhite);
+    gui.setFont(&kFont_ASCII5x7);
+    gui.drawText(10, 230, "FG/BG text", ColorBlack, ColorWhite);
 
     gui.setBigDigitEffectParams(0, 0);
     gui.display();

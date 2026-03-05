@@ -96,27 +96,11 @@ public:
     /// 获取当前字体
     const Font *currentFont() const;
 
-    // --- 使用当前字体（setFont 设置）---
-
-    /// 使用当前字体 + 显式前景色（透明背景）绘制 UTF-8 字符串，自动换行
-    void drawText(int x, int y, const char *utf8, uint8_t color);
-
-    /// 使用当前字体 + 当前前景色绘制 UTF-8 字符串，自动换行
+    /// 使用当前字体 + 当前前景色/背景色绘制 UTF-8 字符串，自动换行
     void drawText(int x, int y, const char *utf8);
 
     /// 使用当前字体 + 显式前景/背景色绘制 UTF-8 字符串，自动换行
     void drawText(int x, int y, const char *utf8, uint8_t fgColor, uint8_t bgColor);
-
-    // --- 使用显式字体（覆盖当前字体）---
-
-    /// 使用指定字体 + 显式前景色（透明背景）绘制 UTF-8 字符串，自动换行
-    void drawText(int x, int y, const char *utf8, const Font *font, uint8_t color);
-
-    /// 使用指定字体 + 当前前景色绘制 UTF-8 字符串，自动换行
-    void drawText(int x, int y, const char *utf8, const Font *font);
-
-    /// 使用指定字体 + 显式前景/背景色绘制 UTF-8 字符串，自动换行
-    void drawText(int x, int y, const char *utf8, const Font *font, uint8_t fgColor, uint8_t bgColor);
 
     /// 设置大号数字效果参数（加粗、描边），修改后影响后续 drawBigDigits
     void setBigDigitEffectParams(const BigDigitEffectParams &params);
@@ -148,9 +132,8 @@ private:
     const Font *currentFont_;              ///< 当前字体（setFont 设置）
     BigDigitEffectParams bigDigitEffect_;  ///< 大号数字加粗/描边参数
 
-    /// 所有 drawText 重载收敛到此：hasBg=false 时透明背景（忽略 bgColor）
     void drawTextImpl(int x, int y, const char *utf8, const Font *font,
-                      uint8_t fgColor, bool hasBg, uint8_t bgColor);
+                      uint8_t fgColor, uint8_t bgColor);
 };
 
 #endif //ESP32_RLCD4_2_GUI_H
