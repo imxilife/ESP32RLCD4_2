@@ -382,7 +382,8 @@ def generate_ascii_cpp(font_path, target_w, target_h, chars, output_path):
         f"static const int  k{label}_W      = {target_w};",
         f"static const int  k{label}_H      = {target_h};",
         f"static const int  k{label}_Stride = {stride};",
-        f'static const char k{label}_Chars[] = "{chars}";',
+        # 转义 C 字符串中的反斜杠和双引号
+        f'static const char k{label}_Chars[] = "{chars.replace(chr(92), chr(92)*2).replace(chr(34), chr(92)+chr(34))}";',
         f"static const uint8_t k{label}_Glyphs[{len(chars)}][{stride * target_h}] = {{",
     ]
 
