@@ -3,17 +3,11 @@
 //
 
 #include "Gui.h"
-#include "fonts/Font5x7.h"
-#include "fonts/FontDigits.h"
+#include "fonts/Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_72_96.h"
 #include "effects/GlyphEffect.h"
-#include "fonts/chinese_font.h"
 
 #include <stdlib.h>
 #include <stdint.h>
-
-// 大号数字效果处理缓冲（72x96 stride=9 → 864 字节）
-// 若后续更换大号数字字体尺寸，请同步调整缓冲区大小：strideBytes * height
-static uint8_t s_bigDigitEffectBuffer[864];
 
 // ========================== 内部帮助函数 ==========================
 
@@ -84,7 +78,7 @@ Gui::Gui(DisplayPort *lcd, int width, int height)
       fgColor_(ColorBlack),
       bgColor_(ColorWhite),
       chineseGlyphProvider_(nullptr),
-      currentFont_(&kFont_Mixed),
+      currentFont_(&kFont_Alibaba72x96),
       bigDigitEffect_(BigDigitEffectParamsDefault()) {}
 
 void Gui::clear(uint8_t color) {

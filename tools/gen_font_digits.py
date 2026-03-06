@@ -40,10 +40,12 @@ def to_1bpp(canvas_l, target_w, target_h, threshold):
     return data
 
 
-def render_char(ch, target_w, target_h, font_path, threshold=90):
+def render_char(ch, target_w, target_h, font_path, threshold=70):
     """
     通用字符渲染：4× 超采样 → LANCZOS 缩放 → 阈值二值化
-    字形自动缩放充满 (target_w-4)×(target_h-4) 范围并居中
+    字形自动缩放充满 (target_w-4)×(target_h-4) 范围并居中。
+    宽度超出 target_w 时用负 ox 传入 paste，PIL 自动两侧对称裁剪。
+    threshold=70（而非 90）保证曲线字形顶/底抗锯齿像素不被截掉，确保视觉等高。
     """
     scale = 4
     pad   = 10 * scale
@@ -62,18 +64,19 @@ def render_char(ch, target_w, target_h, font_path, threshold=90):
     cropped        = img.crop(bbox)
     glyph_w, glyph_h = cropped.size
 
-    avail_w = target_w - 4
     avail_h = target_h - 4
-    ratio   = min(avail_w / glyph_w, avail_h / glyph_h)
-    new_w   = max(1, round(glyph_w * ratio))
-    new_h   = max(1, round(glyph_h * ratio))
+    # 始终按高度缩放，保证所有字形视觉等高。
+    ratio = avail_h / glyph_h
+    new_w = max(1, round(glyph_w * ratio))
+    new_h = max(1, round(glyph_h * ratio))
 
     scaled = cropped.resize((new_w, new_h), Image.LANCZOS)
 
     canvas = Image.new('L', (target_w, target_h), 0)
     ox = (target_w - new_w) // 2
     oy = (target_h - new_h) // 2
-    canvas.paste(scaled, (max(0, ox), max(0, oy)))
+    # 负 ox 时 PIL 会对称裁剪左右两侧，避免只裁右边
+    canvas.paste(scaled, (ox, max(0, oy)))
 
     return to_1bpp(canvas, target_w, target_h, threshold)
 
@@ -287,9 +290,14 @@ def select_mode():
 
 def find_fonts():
     """查找项目根目录下的所有字体文件"""
+    seen = set()
     fonts = []
     for ext in ['*.ttf', '*.otf', '*.TTF', '*.OTF']:
-        fonts.extend(glob.glob(str(PROJECT_ROOT / ext)))
+        for f in glob.glob(str(PROJECT_ROOT / ext)):
+            key = os.path.normcase(os.path.abspath(f))
+            if key not in seen:
+                seen.add(key)
+                fonts.append(f)
     return sorted(fonts)
 
 
@@ -355,14 +363,15 @@ def input_chinese_chars():
 
 # ─────────────────────────── 代码生成 ─────────────────────────────
 
-def make_label(font_path, target_h):
+def make_label(font_path, target_w, target_h, mode):
     stem = Path(font_path).stem.replace('-', '_').replace(' ', '_')
-    return f"Font{target_h}_{stem}"
+    prefix = 'ascii' if mode == 'ascii' else 'chinese'
+    return f"Font_{prefix}_{stem}_{target_w}_{target_h}"
 
 
-def generate_ascii_cpp(font_path, target_w, target_h, chars, output_path):
+def generate_ascii_cpp(font_path, target_w, target_h, chars, output_path, char_data=None):
     """生成 ASCII 字模 C++ 文件（含 Font 结构体定义）"""
-    label     = make_label(font_path, target_h)
+    label     = make_label(font_path, target_w, target_h, 'ascii')
     stride    = (target_w + 7) // 8
     font_name = Path(font_path).stem
 
@@ -387,15 +396,17 @@ def generate_ascii_cpp(font_path, target_w, target_h, chars, output_path):
         f"static const uint8_t k{label}_Glyphs[{len(chars)}][{stride * target_h}] = {{",
     ]
 
-    char_data = []
-    for ch in chars:
-        if ch == ':':
-            data = draw_colon(target_w, target_h)
-        elif ch == '.':
-            data = draw_dot(target_w, target_h)
-        else:
-            data = render_char(ch, target_w, target_h, font_path)
-        char_data.append((ch, data))
+    if char_data is None:
+        char_data = []
+        for ch in chars:
+            if ch == ':':
+                data = draw_colon(target_w, target_h)
+            elif ch == '.':
+                data = draw_dot(target_w, target_h)
+            else:
+                data = render_char(ch, target_w, target_h, font_path)
+            char_data.append((ch, data))
+    for ch, data in char_data:
         lines.append("    {" + ','.join(f'0x{b:02X}' for b in data) + f"}}, // '{ch}'")
 
     lines += [
@@ -438,9 +449,9 @@ def generate_ascii_cpp(font_path, target_w, target_h, chars, output_path):
     return char_data
 
 
-def generate_chinese_cpp(font_path, target_w, target_h, chars, output_path):
+def generate_chinese_cpp(font_path, target_w, target_h, chars, output_path, char_data=None):
     """生成中文字模 C++ 文件（含 Font 结构体定义）"""
-    label     = make_label(font_path, target_h)
+    label     = make_label(font_path, target_w, target_h, 'chinese')
     stride    = (target_w + 7) // 8
     font_name = Path(font_path).stem
 
@@ -472,11 +483,13 @@ def generate_chinese_cpp(font_path, target_w, target_h, chars, output_path):
         f"static const GlyphEntry k{label}_Glyphs[] = {{",
     ]
 
-    char_data = []
-    for ch in char_list:
-        data = render_char(ch, target_w, target_h, font_path)
-        cp   = ord(ch)
-        char_data.append((ch, data))
+    if char_data is None:
+        char_data = []
+        for ch in char_list:
+            data = render_char(ch, target_w, target_h, font_path)
+            char_data.append((ch, data))
+    for ch, data in char_data:
+        cp = ord(ch)
         lines.append(
             f"    {{0x{cp:04X}, {{{','.join(f'0x{b:02X}' for b in data)}}}}}, // '{ch}'"
         )
@@ -563,7 +576,7 @@ def main():
     print()
 
     # 确认
-    label           = make_label(font_path, target_h)
+    label           = make_label(font_path, target_w, target_h, mode)
     output_path     = FONTS_OUTPUT_DIR / f"{label}.cpp"
     mode_label      = 'ASCII' if mode == 'ascii' else '中文'
     print("-" * 60)
@@ -580,25 +593,63 @@ def main():
         return
     print()
 
-    # 生成
+    # 渲染字模数据
+    print("正在渲染字模数据，请稍候...")
+    try:
+        if mode == 'ascii':
+            char_data = []
+            for ch in chars:
+                if ch == ':':
+                    data = draw_colon(target_w, target_h)
+                elif ch == '.':
+                    data = draw_dot(target_w, target_h)
+                else:
+                    data = render_char(ch, target_w, target_h, font_path)
+                char_data.append((ch, data))
+        else:
+            char_data = [
+                (ch, render_char(ch, target_w, target_h, font_path))
+                for ch in chars
+            ]
+    except Exception as e:
+        print(f"❌ 渲染失败: {e}")
+        import traceback
+        traceback.print_exc()
+        return
+
+    # 预览
+    print_glyph_preview(char_data, target_w, target_h)
+
+    # 确认是否写入
+    print("是否将字模数据写入 fonts 目录？")
+    print("  1. 是")
+    print("  2. 否")
+    while True:
+        write_choice = ask("请选择 (1/2): ")
+        if write_choice == '1':
+            break
+        if write_choice == '2':
+            print("取消，未写入任何文件")
+            return
+        print("❌ 请输入 1 或 2")
+
+    # 写入文件
     FONTS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     try:
         if mode == 'ascii':
-            char_data = generate_ascii_cpp(font_path, target_w, target_h, chars, output_path)
+            generate_ascii_cpp(font_path, target_w, target_h, chars, output_path, char_data)
         else:
-            char_data = generate_chinese_cpp(font_path, target_w, target_h, chars, output_path)
+            generate_chinese_cpp(font_path, target_w, target_h, chars, output_path, char_data)
 
-        print(f"✓ 生成成功: {output_path.name}")
+        print(f"✓ 写入成功: {output_path.name}")
         print(f"✓ 头文件  : {label}.h")
         print()
         print("在 C++ 中使用示例:")
         print(f'  #include "fonts/{label}.h"')
         print(f"  gui.setFont(&k{label});")
         print(f'  gui.drawText(x, y, "...");')
-
-        print_glyph_preview(char_data, target_w, target_h)
     except Exception as e:
-        print(f"❌ 生成失败: {e}")
+        print(f"❌ 写入失败: {e}")
         import traceback
         traceback.print_exc()
 

@@ -11,7 +11,7 @@
 //   - 这个文件里的 kFont96_..._Glyphs 就是这些固定尺寸的点阵缓存，供运行时直接查表绘制，无需再依赖 TTF 渲染。
 //
 
-#include "Font96_AlibabaPuHuiTi_3_75_SemiBold.h"
+#include "Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_72_96.h"
 
 namespace {
 

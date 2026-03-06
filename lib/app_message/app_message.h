@@ -9,6 +9,7 @@ enum MsgType {
     MSG_HUMITURE_UPDATE, // payload: float temp, float hum
     MSG_WIFI_STATUS,     // payload: bool connected
     MSG_WIFI_UI,         // payload: 文本行1/行2，用于 WiFi 配网过程提示
+    MSG_NTP_SYNC,        // payload: ntpTime（NTP 同步成功，loop 负责写入 RTC）
     MSG_TOUCH_EVENT,     // payload: int x, int y
     MSG_BUTTON_EVENT,    // payload: int btnId
 };
@@ -45,6 +46,10 @@ struct AppMessage {
         struct {
             int btnId;
         } button;
+
+        struct {
+            uint16_t year;
+            uint8_t  month, day, hour, minute, second, weekday;
+        } ntpTime;
     };
 };
-
