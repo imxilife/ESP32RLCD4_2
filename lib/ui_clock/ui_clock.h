@@ -9,3 +9,6 @@ void drawDateWeek(const RTCTime &t);
 
 // MSG_RTC_UPDATE 分发处理：按分钟/按天触发重绘
 void handleRtcUpdate(const RTCTime &t);
+
+// 重置上次绘制缓存，使下次 handleRtcUpdate 强制全量重绘（NTP 同步后调用）
+void resetClockState();

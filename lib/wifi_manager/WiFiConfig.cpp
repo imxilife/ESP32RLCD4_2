@@ -32,8 +32,8 @@ void WiFiConfig::emitMessage(const char* line1, const char* line2) {
 bool WiFiConfig::begin() {
     Serial.println("\n=== WiFi 初始化 ===");
 
-    // 提示：WiFi 初始化中
-    emitMessage("WiFi初始化中...", "");
+    // 提示：WiFi 连接中
+    emitMessage("WiFi连接中...", "");
 
     // 设置回调函数
     wifiManager.setSaveConfigCallback(saveConfigCallback);
@@ -61,10 +61,10 @@ bool WiFiConfig::begin() {
         Serial.println(WiFi.localIP());
         wifiConnected = true;
 
-        // 提示：WiFi 已连接 + IP 信息
+        // 提示：WiFi 连接成功 + IP 信息
         char ipStr[48];
         snprintf(ipStr, sizeof(ipStr), "IP:%s", WiFi.localIP().toString().c_str());
-        emitMessage("WiFi已连接", ipStr);
+        emitMessage("WiFi连接成功", ipStr);
 
         // WiFi 连接成功后触发 NTP 同步，结果通过回调通知 loop() 写入 RTC
         syncNTP();
@@ -75,7 +75,7 @@ bool WiFiConfig::begin() {
         wifiConnected = false;
 
         // 提示：WiFi 连接失败
-        emitMessage("WiFi连接失败", "");
+        emitMessage("WiFi连接失败", "");  // 保持不变
 
         return false;
     }
@@ -90,7 +90,7 @@ bool WiFiConfig::syncNTP() {
     Serial.println("\n=== NTP 时间同步 ===");
 
     // 提示：NTP 时间同步中
-    emitMessage("NTP时间同步中...", "");
+    emitMessage("NTP sync...", "");
 
     // 配置 NTP 服务器
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2, ntpServer3);
@@ -117,8 +117,8 @@ bool WiFiConfig::syncNTP() {
     if (retryCount >= maxRetries) {
         Serial.println("NTP 时间同步失败：超时");
 
-        // 提示：NTP 同步失败
-        emitMessage("NTP同步失败", "");
+        // 提示：NTP 同步失败（分组显示：line1 保留 "NTP sync..." 标题）
+        emitMessage("NTP sync...", "sync fail...");
 
         return false;
     }
@@ -134,7 +134,11 @@ bool WiFiConfig::syncNTP() {
                   timeinfo.tm_sec,
                   timeinfo.tm_wday);
 
-    // 通过回调将时间数据交给 loop()，由 loop() 负责写入 RTC
+    // 先提示：NTP 同步成功（分组显示：line1="NTP sync..." line2="sync ok"）
+    // 必须先入队，后续 NTP 回调投递 MSG_NTP_SYNC，loop() 处理时才会清屏画时钟
+    emitMessage("NTP sync...", "sync ok");
+
+    // 通过回调将时间数据交给 loop()，由 loop() 负责写入 RTC 并立即刷新时钟
     if (staticNTPCallback) {
         staticNTPCallback(
             (uint16_t)(timeinfo.tm_year + 1900),
@@ -146,12 +150,6 @@ bool WiFiConfig::syncNTP() {
             (uint8_t)(timeinfo.tm_wday)
         );
     }
-
-    // 提示：NTP 同步成功 + 当前时间
-    char timeStr[32];
-    snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d",
-             timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec);
-    emitMessage("NTP同步成功", timeStr);
 
     return true;
 }
@@ -178,7 +176,7 @@ void WiFiConfig::saveConfigCallback() {
     Serial.println("WiFi 配置已保存");
 
     // 提示：配置已保存，正在连接
-    emitMessage("配置已保存", "正在连接...");
+    emitMessage("WiFi连接中...", "");
 }
 
 // WiFi 配置门户启动回调（进入配网模式时调用）
@@ -189,8 +187,8 @@ void WiFiConfig::configModeCallback(WiFiManager *myWiFiManager) {
     Serial.print("配置门户 IP: ");
     Serial.println(WiFi.softAPIP());
 
-    // 提示：进入 WiFi 配置模式 + AP 信息
-    char apInfo[64];
-    snprintf(apInfo, sizeof(apInfo), "AP:%s", WiFi.softAPSSID().c_str());
-    emitMessage("WiFi配置模式", apInfo);
+    // 提示：未找到可用 WiFi，显示配网 URL
+    char apURL[48];
+    snprintf(apURL, sizeof(apURL), "http://%s", WiFi.softAPIP().toString().c_str());
+    emitMessage("未找可用WiFi", apURL);
 }

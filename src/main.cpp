@@ -12,6 +12,7 @@
 #include <app_message.h>
 #include <ui_clock.h>
 #include <app_tasks.h>
+#include "fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20.h"
 
 #define ENABLE_GUI_TESTS 0
 
@@ -95,11 +96,38 @@ static void handleHumiture(float temperature, float humidity) {
     (void)humidX;
 }
 
+// 统计 UTF-8 字符串的 Unicode 码点数（用于计算文本宽度）
+static int utf8Count(const char *s) {
+    int n = 0;
+    while (*s) { if ((*s & 0xC0) != 0x80) n++; s++; }
+    return n;
+}
+
 static void handleWifiUi(const AppMessage &msg) {
-    gui.fillRect(0, 100, 400, 100, ColorWhite);
-    // TODO: gui.drawUTF8String(10, 110, msg.wifiUi.line1, ColorBlack);
-    // TODO: gui.drawSmallDigits(10, 140, msg.wifiUi.line2, ColorBlack);
-    (void)msg;
+    // 全屏清除，WiFi 文案居中显示
+    gui.clear();
+    gui.setFont(&kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20);
+
+    static const int kFontW   = 20;
+    static const int kFontH   = 20;
+    static const int kLineGap = 8;
+    static const int kScreenW = 400;
+    static const int kScreenH = 300;
+
+    bool hasLine2 = msg.wifiUi.line2[0] != '\0';
+    int  totalH   = hasLine2 ? (kFontH + kLineGap + kFontH) : kFontH;
+    int  startY   = (kScreenH - totalH) / 2;
+
+    if (msg.wifiUi.line1[0] != '\0') {
+        int x = (kScreenW - utf8Count(msg.wifiUi.line1) * kFontW) / 2;
+        if (x < 0) x = 0;
+        gui.drawText(x, startY, msg.wifiUi.line1, ColorBlack, ColorWhite);
+    }
+    if (hasLine2) {
+        int x = (kScreenW - utf8Count(msg.wifiUi.line2) * kFontW) / 2;
+        if (x < 0) x = 0;
+        gui.drawText(x, startY + kFontH + kLineGap, msg.wifiUi.line2, ColorBlack, ColorWhite);
+    }
 }
 
 // ── setup / loop ──────────────────────────────────────────────
@@ -178,13 +206,26 @@ void loop() {
     case MSG_WIFI_UI:
         handleWifiUi(msg);
         break;
-    case MSG_NTP_SYNC:
+    case MSG_NTP_SYNC: {
         // NTP 同步成功，将时间写入 RTC
         rtc.setTime(msg.ntpTime.year, msg.ntpTime.month, msg.ntpTime.day,
                     msg.ntpTime.hour, msg.ntpTime.minute, msg.ntpTime.second,
                     msg.ntpTime.weekday);
         Serial.println("时间已写入 RTC");
+        // 立即清屏并刷新时钟，不等下次分钟变化
+        gui.clear();
+        RTCTime t;
+        t.year    = msg.ntpTime.year;
+        t.month   = msg.ntpTime.month;
+        t.day     = msg.ntpTime.day;
+        t.hour    = msg.ntpTime.hour;
+        t.minute  = msg.ntpTime.minute;
+        t.second  = msg.ntpTime.second;
+        t.weekday = msg.ntpTime.weekday;
+        resetClockState();
+        handleRtcUpdate(t);
         break;
+    }
     case MSG_TOUCH_EVENT:
         Serial.printf("触摸事件: x=%d, y=%d\n", msg.touch.x, msg.touch.y);
         break;

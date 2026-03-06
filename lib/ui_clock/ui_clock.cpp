@@ -74,3 +74,8 @@ void handleRtcUpdate(const RTCTime &t) {
         s_lastDay = t.day;
     }
 }
+
+void resetClockState() {
+    s_lastMinute = 0xFF;
+    s_lastDay    = 0xFF;
+}
