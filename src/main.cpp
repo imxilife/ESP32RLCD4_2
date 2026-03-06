@@ -25,6 +25,10 @@ WiFiConfig wifiConfig;
 
 QueueHandle_t g_msgQueue = nullptr;
 
+// WiFi/NTP 流程期间置 true，抑制时钟重绘，避免 MSG_RTC_UPDATE 闪入 WiFi 文案
+// 归零时机：MSG_NTP_SYNC（成功）或 MSG_WIFI_STATUS（失败/NTP失败）
+static bool g_wifiUiVisible = false;
+
 static constexpr int kTouchIntPin  = -1; // TODO: 设置为真实触摸中断引脚
 static constexpr int kButtonIntPin = -1; // TODO: 设置为真实按键中断引脚
 
@@ -104,7 +108,8 @@ static int utf8Count(const char *s) {
 }
 
 static void handleWifiUi(const AppMessage &msg) {
-    // 全屏清除，WiFi 文案居中显示
+    // 全屏清除，WiFi 文案居中显示；标记 WiFi UI 激活，抑制时钟重绘
+    g_wifiUiVisible = true;
     gui.clear();
     gui.setFont(&kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20);
 
@@ -195,13 +200,21 @@ void loop() {
 
     switch (msg.type) {
     case MSG_RTC_UPDATE:
-        handleRtcUpdate(msg.rtcTime);
+        // WiFi/NTP 流程期间抑制时钟重绘，避免时钟闪入 WiFi 文案区域
+        if (!g_wifiUiVisible)
+            handleRtcUpdate(msg.rtcTime);
         break;
     case MSG_HUMITURE_UPDATE:
         handleHumiture(msg.humiture.temp, msg.humiture.hum);
         break;
     case MSG_WIFI_STATUS:
         if (!msg.wifi.connected) Serial.println("WiFi 连接断开");
+        // WiFi init 阶段结束（连接成功但 NTP 失败、或 WiFi 完全失败），归零标志让时钟可重绘
+        // 若 NTP 同步成功，MSG_NTP_SYNC 先于本消息处理时已归零，此处 guard 避免重复 resetClockState
+        if (g_wifiUiVisible) {
+            g_wifiUiVisible = false;
+            resetClockState();
+        }
         break;
     case MSG_WIFI_UI:
         handleWifiUi(msg);
@@ -212,7 +225,8 @@ void loop() {
                     msg.ntpTime.hour, msg.ntpTime.minute, msg.ntpTime.second,
                     msg.ntpTime.weekday);
         Serial.println("时间已写入 RTC");
-        // 立即清屏并刷新时钟，不等下次分钟变化
+        // 归零 WiFi UI 标志，立即清屏并刷新时钟，不等下次分钟变化
+        g_wifiUiVisible = false;
         gui.clear();
         RTCTime t;
         t.year    = msg.ntpTime.year;
