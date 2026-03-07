@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WiFiManager.h>
+#include <esp_wpa2.h>
 #include <time.h>
 
 // WiFi 配网/时间同步过程中的文本提示回调
@@ -24,8 +25,12 @@ public:
     // 设置 NTP 同步成功回调
     void setNTPCallback(WiFiNTPCallback cb);
 
-    // 初始化 WiFi（阻塞，含配网和 NTP 同步）
+    // 初始化 WiFi（阻塞，含配网和 NTP 同步）—— 普通 PSK 热点配网流程
     bool begin();
+
+    // 初始化 WiFi（阻塞）—— WPA2-Enterprise PEAP，跳过 CA 证书验证
+    bool beginEnterprise(const char* ssid, const char* identity,
+                         const char* username, const char* password);
 
     // 检查 WiFi 是否已连接
     bool isConnected();
@@ -59,7 +64,6 @@ private:
     static const long gmtOffset_sec;
     static const int daylightOffset_sec;
 
-    static void saveConfigCallback();
     static void configModeCallback(WiFiManager *myWiFiManager);
 };
 

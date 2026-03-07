@@ -94,7 +94,9 @@ static int utf8Count(const char *s) {
 }
 
 static void handleHumiture(float temperature, float humidity) {
+#if DISABLED
     Serial.printf("温度: %.1f °C  湿度: %.1f %%\n", temperature, humidity);
+#endif
 
     static const int kAdvX     = 28;              // Oswald Light 28×40 per-char advance
     static const int kFontH    = 40;

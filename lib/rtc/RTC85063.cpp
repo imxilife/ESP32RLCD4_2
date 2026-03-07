@@ -141,10 +141,12 @@ RTCTime RTC85063::now() {
     time.weekday = buf[4] & 0x07;
     time.month = bcd2bin(buf[5] & 0x1F);
     time.year = 2020 + bcd2bin(buf[6]);
-    
+
+#if DISABLED
     Serial.printf("%04d/%02d/%02d %02d:%02d:%02d\n",
                   time.year, time.month, time.day, time.hour, time.minute, time.second);
     Serial.println();
+#endif
     return time;
 }
 

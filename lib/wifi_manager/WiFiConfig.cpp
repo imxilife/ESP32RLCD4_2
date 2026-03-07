@@ -30,55 +30,49 @@ void WiFiConfig::emitMessage(const char* line1, const char* line2) {
 }
 
 bool WiFiConfig::begin() {
-    Serial.println("\n=== WiFi 初始化 ===");
-
-    // 提示：WiFi 连接中
+    Serial.println("\n=== WiFi 初始化 (WPA2-Enterprise PEAP) ===");
     emitMessage("WiFi连接中...", "");
 
-    // 设置回调函数
-    wifiManager.setSaveConfigCallback(saveConfigCallback);
+    // 企业 WiFi 额外字段：用户名（门户表单 Password 字段复用为企业密码）
+    WiFiManagerParameter param_user("user", "Enterprise Username", "", 64);
+    wifiManager.addParameter(&param_user);
+
+    wifiManager.setDebugOutput(true);
     wifiManager.setAPCallback(configModeCallback);
 
-    // 设置连接超时时间（秒）
-    wifiManager.setConnectTimeout(10);  // 每次连接尝试 10 秒超时
+    // 表单提交后，PSK 连接尝试快速超时（企业 WiFi 必然失败）
+    wifiManager.setConnectTimeout(3);
+    wifiManager.setConfigPortalTimeout(0);  // 门户不超时，等用户操作
 
-    // 设置配置门户超时时间（秒），0 表示不超时
-    wifiManager.setConfigPortalTimeout(0);  // 配网模式不超时，等待用户配置
+    // 表单提交后强制退出门户（不管 PSK 连接是否成功）
+    wifiManager.setBreakAfterConfig(true);
 
-    // 设置 AP 的 SSID（使用设备 MAC 地址确保唯一性）
+    // 回调仅用于 UI 提示，不在此读凭据（此时 WiFi.SSID() 还是空）
+    wifiManager.setSaveConfigCallback([this]() {
+        emitMessage("WiFi连接中...", "");
+    });
+
     String apName = "ESP32_RLCD_" + String((uint32_t)ESP.getEfuseMac(), HEX);
 
-    // autoConnect 会自动完成以下流程：
-    // 1. 检查是否有保存的 WiFi 配置
-    // 2. 如果有，尝试连接（默认重试多次）
-    // 3. 如果没有或连接失败，自动创建热点并启动配置门户
-    // 4. 等待用户配置完成后自动连接新的 WiFi
-    if (wifiManager.autoConnect(apName.c_str())) {
-        Serial.println("WiFi 连接成功！");
-        Serial.print("SSID: ");
-        Serial.println(WiFi.SSID());
-        Serial.print("IP 地址: ");
-        Serial.println(WiFi.localIP());
-        wifiConnected = true;
+    // 启动配网门户：阻塞直到用户提交表单 + PSK 连接尝试结束后返回
+    wifiManager.startConfigPortal(apName.c_str());
 
-        // 提示：WiFi 连接成功 + IP 信息
-        char ipStr[48];
-        snprintf(ipStr, sizeof(ipStr), "IP:%s", WiFi.localIP().toString().c_str());
-        emitMessage("WiFi连接成功", ipStr);
+    // 门户退出后读凭据：
+    //   getWiFiSSID(true) / getWiFiPass(true) 从 flash 读，WiFiManager 已在发起连接前写入
+    //   param_user.getValue() 从自定义字段读
+    String ssid = wifiManager.getWiFiSSID(true);
+    String pass = wifiManager.getWiFiPass(true);
+    String user = String(param_user.getValue());
 
-        // WiFi 连接成功后触发 NTP 同步，结果通过回调通知 loop() 写入 RTC
-        syncNTP();
+    Serial.printf("[DEBUG] 门户退出: SSID=%s User=%s\n", ssid.c_str(), user.c_str());
 
-        return true;
-    } else {
-        Serial.println("WiFi 连接失败");
-        wifiConnected = false;
-
-        // 提示：WiFi 连接失败
-        emitMessage("WiFi连接失败", "");  // 保持不变
-
-        return false;
+    if (ssid.length() > 0 && user.length() > 0) {
+        return beginEnterprise(ssid.c_str(), user.c_str(), user.c_str(), pass.c_str());
     }
+
+    Serial.println("未收到有效凭据（SSID 或 Username 为空），WiFi 连接跳过");
+    emitMessage("WiFi连接失败", "");
+    return false;
 }
 
 bool WiFiConfig::syncNTP() {
@@ -154,6 +148,55 @@ bool WiFiConfig::syncNTP() {
     return true;
 }
 
+bool WiFiConfig::beginEnterprise(const char* ssid, const char* identity,
+                                  const char* username, const char* password) {
+    Serial.println("\n=== WiFi 企业认证初始化 (WPA2-Enterprise PEAP) ===");
+    Serial.printf("SSID    : %s\n", ssid);
+    Serial.printf("Identity: %s\n", identity);
+    Serial.printf("Username: %s\n", username);
+
+    emitMessage("WiFi连接中...", "");
+
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_STA);
+
+    esp_wifi_sta_wpa2_ent_set_identity((uint8_t*)identity, strlen(identity));
+    esp_wifi_sta_wpa2_ent_set_username((uint8_t*)username, strlen(username));
+    esp_wifi_sta_wpa2_ent_set_password((uint8_t*)password, strlen(password));
+    esp_wifi_sta_wpa2_ent_enable();
+
+    WiFi.begin(ssid);
+
+    Serial.print("正在连接");
+    int retryCount = 0;
+    const int maxRetries = 40;  // 40 × 500ms = 20s
+    while (WiFi.status() != WL_CONNECTED && retryCount < maxRetries) {
+        Serial.print(".");
+        delay(500);
+        retryCount++;
+    }
+    Serial.println();
+
+    if (WiFi.status() == WL_CONNECTED) {
+        Serial.println("WiFi 企业认证连接成功！");
+        Serial.printf("SSID: %s\n", WiFi.SSID().c_str());
+        Serial.printf("IP  : %s\n", WiFi.localIP().toString().c_str());
+        wifiConnected = true;
+
+        char ipStr[48];
+        snprintf(ipStr, sizeof(ipStr), "IP:%s", WiFi.localIP().toString().c_str());
+        emitMessage("WiFi连接成功", ipStr);
+
+        syncNTP();
+        return true;
+    } else {
+        Serial.printf("WiFi 企业认证连接失败，WiFi.status()=%d\n", (int)WiFi.status());
+        wifiConnected = false;
+        emitMessage("WiFi连接失败", "");
+        return false;
+    }
+}
+
 bool WiFiConfig::isConnected() {
     return wifiConnected && (WiFi.status() == WL_CONNECTED);
 }
@@ -169,14 +212,6 @@ String WiFiConfig::getSSID() {
 void WiFiConfig::reset() {
     wifiManager.resetSettings();
     Serial.println("WiFi 配置已重置");
-}
-
-// WiFi 配置保存回调
-void WiFiConfig::saveConfigCallback() {
-    Serial.println("WiFi 配置已保存");
-
-    // 提示：配置已保存，正在连接
-    emitMessage("WiFi连接中...", "");
 }
 
 // WiFi 配置门户启动回调（进入配网模式时调用）
