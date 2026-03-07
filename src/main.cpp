@@ -227,10 +227,14 @@ void setup() {
         attachInterrupt(digitalPinToInterrupt(kButtonIntPin), onButtonISR, FALLING);
     }
 
+    // GPIO4 电池 ADC：配置 11dB 衰减（量程 ~0~3.1V），必须在主核心初始化
+    analogSetPinAttenuation(4, ADC_11db);
+
     // 创建后台任务（各任务负责自身外设初始化，失败时通过消息队列上报）
-    xTaskCreate(rtcTask,      "rtcTask",  2048, nullptr, 2, nullptr);
-    xTaskCreate(humitureTask, "humTask",  2048, nullptr, 1, nullptr);
-    xTaskCreate(wifiTask,     "wifiTask", 8192, nullptr, 2, nullptr);
+    xTaskCreate(rtcTask,      "rtcTask",   2048, nullptr, 2, nullptr);
+    xTaskCreate(humitureTask, "humTask",   2048, nullptr, 1, nullptr);
+    xTaskCreate(wifiTask,     "wifiTask",  8192, nullptr, 2, nullptr);
+    xTaskCreate(batteryTask,  "battTask",  4096, nullptr, 1, nullptr);
 }
 
 // 主线程：作为 UI Looper，只处理消息并更新界面
@@ -286,6 +290,9 @@ void loop() {
         handleRtcUpdate(t);
         break;
     }
+    case MSG_BATTERY_UPDATE:
+        Serial.printf("电池电压: %.2f V\n", msg.battery.voltage);
+        break;
     case MSG_TOUCH_EVENT:
         Serial.printf("触摸事件: x=%d, y=%d\n", msg.touch.x, msg.touch.y);
         break;

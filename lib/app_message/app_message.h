@@ -12,6 +12,7 @@ enum MsgType {
     MSG_NTP_SYNC,        // payload: ntpTime（NTP 同步成功，loop 负责写入 RTC）
     MSG_TOUCH_EVENT,     // payload: int x, int y
     MSG_BUTTON_EVENT,    // payload: int btnId
+    MSG_BATTERY_UPDATE,  // payload: float voltage（单位 V）
 };
 
 // WiFi UI 文本最大长度（UTF-8 字节数上限）
@@ -51,5 +52,9 @@ struct AppMessage {
             uint16_t year;
             uint8_t  month, day, hour, minute, second, weekday;
         } ntpTime;
+
+        struct {
+            float voltage; // 换算后电池电压（V）
+        } battery;
     };
 };
