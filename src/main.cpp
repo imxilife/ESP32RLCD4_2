@@ -13,6 +13,7 @@
 #include <ui_clock.h>
 #include <app_tasks.h>
 #include "fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20.h"
+#include "fonts/Font_chinese_Oswald_Light_28_40.h"
 
 #define ENABLE_GUI_TESTS 0
 
@@ -85,26 +86,71 @@ void ntpSyncHandler(uint16_t year, uint8_t month, uint8_t day,
 
 // ── 消息处理 ──────────────────────────────────────────────────
 
-static void handleHumiture(float temperature, float humidity) {
-    Serial.printf("温度: %.1f °C  湿度: %.1f %%\n", temperature, humidity);
-
-    char tempStr[16], humidStr[16];
-    snprintf(tempStr,  sizeof(tempStr),  "%.1fC",  temperature);
-    snprintf(humidStr, sizeof(humidStr), "%.1f%%", humidity);
-
-    int tempY  = 300 - 32 - 20;
-    int humidX = 400 - (int)strlen(humidStr) * 24 - 20;
-    gui.fillRect(0, tempY - 5, 400, 32 + 10, ColorWhite);
-    // TODO: gui.drawSmallDigits(20, tempY, tempStr, ColorBlack);
-    // TODO: gui.drawSmallDigits(humidX, tempY, humidStr, ColorBlack);
-    (void)humidX;
-}
-
 // 统计 UTF-8 字符串的 Unicode 码点数（用于计算文本宽度）
 static int utf8Count(const char *s) {
     int n = 0;
     while (*s) { if ((*s & 0xC0) != 0x80) n++; s++; }
     return n;
+}
+
+static void handleHumiture(float temperature, float humidity) {
+    Serial.printf("温度: %.1f °C  湿度: %.1f %%\n", temperature, humidity);
+
+    static const int kAdvX     = 28;              // Oswald Light 28×40 per-char advance
+    static const int kFontH    = 40;
+    static const int kY        = 300 - kFontH - 16; // 244
+    static const int kMargin   = 10;
+    static const int kDotR     = 3;               // decimal dot radius
+    static const int kDotSep   = 4;               // gap: char-edge ↔ dot-edge
+    static const int kDotZoneW = 2 * (kDotSep + kDotR); // 14 px consumed by dot zone
+    static const int kDotBaseY = kY + 33;         // decimal dot y ≈ baseline
+    static const int kDegR     = 4;               // ° circle radius
+    static const int kDegOffX  = 0;               // ° cx offset from left of 'C' cell
+    static const int kDegOffY  = 6;               // ° cy offset from top of glyph
+
+    gui.fillRect(0, kY - 4, 400, kFontH + 8, ColorWhite);
+    gui.setFont(&kFont_chinese_Oswald_Light_28_40);
+
+    char numStr[16], intBuf[8], fracBuf[8];
+
+    // ── 温度 左对齐："23.0" → "23" + circle + "0C" ──────────────
+    snprintf(numStr, sizeof(numStr), "%.1f", temperature);
+    {
+        char *dot = strchr(numStr, '.');
+        int   il  = dot ? (int)(dot - numStr) : (int)strlen(numStr);
+        strncpy(intBuf, numStr, il); intBuf[il] = '\0';
+        snprintf(fracBuf, sizeof(fracBuf), "%sC", (dot && dot[1]) ? dot + 1 : "0");
+    }
+    {
+        int ix  = kMargin;
+        int dcx = ix + (int)strlen(intBuf) * kAdvX + kDotSep + kDotR;
+        int fx  = dcx + kDotR + kDotSep;
+        gui.drawText(ix,  kY, intBuf,  ColorBlack, ColorWhite);
+        gui.fillCircle(dcx, kDotBaseY, kDotR, ColorBlack);
+        gui.drawText(fx,  kY, fracBuf, ColorBlack, ColorWhite);
+        // Overlay ° circle at top-left of the last 'C' glyph to form °C
+        int cCellX = fx + ((int)strlen(fracBuf) - 1) * kAdvX;
+        gui.drawCircle(cCellX + kDegOffX, kY + kDegOffY, kDegR, ColorBlack);
+    }
+
+    // ── 湿度 右对齐："56.8" → "56" + circle + "8%" ───────────────
+    snprintf(numStr, sizeof(numStr), "%.1f", humidity);
+    {
+        char *dot = strchr(numStr, '.');
+        int   il  = dot ? (int)(dot - numStr) : (int)strlen(numStr);
+        strncpy(intBuf, numStr, il); intBuf[il] = '\0';
+        snprintf(fracBuf, sizeof(fracBuf), "%s%%", (dot && dot[1]) ? dot + 1 : "0");
+    }
+    {
+        int intW = (int)strlen(intBuf) * kAdvX;
+        int frW  = (int)strlen(fracBuf) * kAdvX;
+        int ix   = 400 - kMargin - intW - kDotZoneW - frW;
+        int dcx  = ix + intW + kDotSep + kDotR;
+        int fx   = dcx + kDotR + kDotSep;
+        gui.drawText(ix,  kY, intBuf,  ColorBlack, ColorWhite);
+        gui.fillCircle(dcx, kDotBaseY, kDotR, ColorBlack);
+        gui.drawText(fx,  kY, fracBuf, ColorBlack, ColorWhite);
+    }
 }
 
 static void handleWifiUi(const AppMessage &msg) {

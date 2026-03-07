@@ -62,7 +62,7 @@ void humitureTask(void* pvParameters) {
                 xQueueSend(g_msgQueue, &msg, 0);
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(30000));
+        vTaskDelay(pdMS_TO_TICKS(2000));
     }
 }
 
