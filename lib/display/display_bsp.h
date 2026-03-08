@@ -10,8 +10,9 @@
 #define AlgorithmOptimization 3  //1:原始算法 2:采用移位算法 3:查表法   来优化CPU
 
 enum ColorSelection {
-  ColorBlack = 0,
-  ColorWhite = 0xff
+  ColorBlack       = 0,
+  ColorWhite       = 0xff,
+  ColorTransparent = 0x01   // 透明背景哨兵：drawText 时跳过背景填充
 };
 
 class DisplayPort {

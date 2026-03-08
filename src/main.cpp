@@ -12,6 +12,7 @@
 #include <app_message.h>
 #include <ui_clock.h>
 #include <app_tasks.h>
+#include <Pomodoro.h>
 #include "fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20.h"
 #include "fonts/Font_chinese_Oswald_Light_28_40.h"
 
@@ -20,9 +21,10 @@
 DisplayPort RlcdPort(12, 11, 5, 40, 41, 400, 300);
 Gui gui(&RlcdPort, 400, 300);
 
-RTC85063  rtc;
-Humiture  humiture;
+RTC85063   rtc;
+Humiture   humiture;
 WiFiConfig wifiConfig;
+Pomodoro   pomodoro(gui);
 
 QueueHandle_t g_msgQueue = nullptr;
 
@@ -229,6 +231,9 @@ void setup() {
         attachInterrupt(digitalPinToInterrupt(kButtonIntPin), onButtonISR, FALLING);
     }
 
+    // 番茄时钟按键 GPIO 初始化
+    pomodoro.begin();
+
     // GPIO4 电池 ADC：配置 11dB 衰减（量程 ~0~3.1V），必须在主核心初始化
     analogSetPinAttenuation(4, ADC_11db);
 
@@ -246,63 +251,75 @@ void loop() {
         return;
     }
 
-    AppMessage msg;
-    // 等待任意模块投递的 UI 消息（带超时，便于未来空闲逻辑扩展）
-    if (xQueueReceive(g_msgQueue, &msg, pdMS_TO_TICKS(100)) != pdTRUE) return;
+    // ── 番茄时钟：轮询按键 + 倒计时更新 ──────────────────────────
+    bool wasActive = pomodoro.isActive();
+    pomodoro.update();
+    bool nowActive = pomodoro.isActive();
 
-    switch (msg.type) {
-    case MSG_RTC_UPDATE:
-        // WiFi/NTP 流程期间抑制时钟重绘，避免时钟闪入 WiFi 文案区域
-        if (!g_wifiUiVisible)
-            handleRtcUpdate(msg.rtcTime);
-        break;
-    case MSG_HUMITURE_UPDATE:
-        handleHumiture(msg.humiture.temp, msg.humiture.hum);
-        break;
-    case MSG_WIFI_STATUS:
-        if (!msg.wifi.connected) Serial.println("WiFi 连接断开");
-        // WiFi init 阶段结束（连接成功但 NTP 失败、或 WiFi 完全失败），归零标志让时钟可重绘
-        // 若 NTP 同步成功，MSG_NTP_SYNC 先于本消息处理时已归零，此处 guard 避免重复 resetClockState
-        if (g_wifiUiVisible) {
-            g_wifiUiVisible = false;
-            resetClockState();
-        }
-        break;
-    case MSG_WIFI_UI:
-        handleWifiUi(msg);
-        break;
-    case MSG_NTP_SYNC: {
-        // NTP 同步成功，将时间写入 RTC
-        rtc.setTime(msg.ntpTime.year, msg.ntpTime.month, msg.ntpTime.day,
-                    msg.ntpTime.hour, msg.ntpTime.minute, msg.ntpTime.second,
-                    msg.ntpTime.weekday);
-        Serial.println("时间已写入 RTC");
-        // 归零 WiFi UI 标志，立即清屏并刷新时钟，不等下次分钟变化
-        g_wifiUiVisible = false;
+    // 番茄时钟退出 → 清屏并强制时钟重绘
+    if (wasActive && !nowActive) {
         gui.clear();
-        RTCTime t;
-        t.year    = msg.ntpTime.year;
-        t.month   = msg.ntpTime.month;
-        t.day     = msg.ntpTime.day;
-        t.hour    = msg.ntpTime.hour;
-        t.minute  = msg.ntpTime.minute;
-        t.second  = msg.ntpTime.second;
-        t.weekday = msg.ntpTime.weekday;
         resetClockState();
-        handleRtcUpdate(t);
-        break;
     }
-    case MSG_BATTERY_UPDATE:
-        Serial.printf("电池电压: %.2f V\n", msg.battery.voltage);
-        break;
-    case MSG_TOUCH_EVENT:
-        Serial.printf("触摸事件: x=%d, y=%d\n", msg.touch.x, msg.touch.y);
-        break;
-    case MSG_BUTTON_EVENT:
-        Serial.printf("按键事件: id=%d\n", msg.button.btnId);
-        break;
-    default:
-        break;
+
+    // ── 消息队列（50ms 超时，保证按键响应帧率）──────────────────
+    AppMessage msg;
+    if (xQueueReceive(g_msgQueue, &msg, pdMS_TO_TICKS(50)) == pdTRUE) {
+        switch (msg.type) {
+        case MSG_RTC_UPDATE:
+            // 番茄模式或 WiFi UI 期间抑制时钟重绘
+            if (!nowActive && !g_wifiUiVisible)
+                handleRtcUpdate(msg.rtcTime);
+            break;
+        case MSG_HUMITURE_UPDATE:
+            if (!nowActive)
+                handleHumiture(msg.humiture.temp, msg.humiture.hum);
+            break;
+        case MSG_WIFI_STATUS:
+            if (!msg.wifi.connected) Serial.println("WiFi 连接断开");
+            if (g_wifiUiVisible) {
+                g_wifiUiVisible = false;
+                resetClockState();
+            }
+            break;
+        case MSG_WIFI_UI:
+            if (!nowActive)
+                handleWifiUi(msg);
+            break;
+        case MSG_NTP_SYNC: {
+            // NTP 同步始终写入 RTC；仅在非番茄模式下刷新时钟 UI
+            rtc.setTime(msg.ntpTime.year, msg.ntpTime.month, msg.ntpTime.day,
+                        msg.ntpTime.hour, msg.ntpTime.minute, msg.ntpTime.second,
+                        msg.ntpTime.weekday);
+            Serial.println("时间已写入 RTC");
+            if (!nowActive) {
+                g_wifiUiVisible = false;
+                gui.clear();
+                RTCTime t;
+                t.year    = msg.ntpTime.year;
+                t.month   = msg.ntpTime.month;
+                t.day     = msg.ntpTime.day;
+                t.hour    = msg.ntpTime.hour;
+                t.minute  = msg.ntpTime.minute;
+                t.second  = msg.ntpTime.second;
+                t.weekday = msg.ntpTime.weekday;
+                resetClockState();
+                handleRtcUpdate(t);
+            }
+            break;
+        }
+        case MSG_BATTERY_UPDATE:
+            Serial.printf("电池电压: %.2f V\n", msg.battery.voltage);
+            break;
+        case MSG_TOUCH_EVENT:
+            Serial.printf("触摸事件: x=%d, y=%d\n", msg.touch.x, msg.touch.y);
+            break;
+        case MSG_BUTTON_EVENT:
+            Serial.printf("按键事件: id=%d\n", msg.button.btnId);
+            break;
+        default:
+            break;
+        }
     }
 
     // 统一在主线程刷屏，避免多任务并发操作 GUI

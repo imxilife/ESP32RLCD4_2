@@ -473,7 +473,8 @@ void Gui::drawTextImpl(int x, int y, const char *utf8, const Font *font,
                 cursorX = x;
                 cursorY += lineHeight;
             }
-            fillRect(cursorX, cursorY, advanceX, h, bgColor);
+            if (bgColor != ColorTransparent)
+                fillRect(cursorX, cursorY, advanceX, h, bgColor);
             for (int j = 0; j < h; ++j) {
                 for (int i = 0; i < w; ++i) {
                     int byteIndex = j * stride + (i >> 3);
@@ -491,7 +492,8 @@ void Gui::drawTextImpl(int x, int y, const char *utf8, const Font *font,
                 cursorX = x;
                 cursorY += lineHeight;
             }
-            fillRect(cursorX, cursorY, size, size, bgColor);
+            if (bgColor != ColorTransparent)
+                fillRect(cursorX, cursorY, size, size, bgColor);
             drawRect(cursorX, cursorY, size, size, fgColor);
             drawLine(cursorX, cursorY, cursorX + size - 1, cursorY + size - 1, fgColor);
             drawLine(cursorX + size - 1, cursorY, cursorX, cursorY + size - 1, fgColor);

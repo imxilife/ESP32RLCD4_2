@@ -4,7 +4,12 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:deepwiki.com)",
-      "Bash(pio run -e esp32s3box)"
+      "Bash(pio run -e esp32s3box)",
+      "Bash(python3 -c \":*)",
+      "Bash(python tools/gen_font_digits.py)",
+      "Bash(python -c \":*)",
+      "Bash(ls d:/ESP32RLCD4_2/*.ttf d:/ESP32RLCD4_2/*.otf d:/ESP32RLCD4_2/*.TTF d:/ESP32RLCD4_2/*.OTF)",
+      "Bash(xargs -I{} basename {})"
     ]
   }
 }
