@@ -28,8 +28,8 @@ Pomodoro   pomodoro(gui);
 
 QueueHandle_t g_msgQueue = nullptr;
 
-// WiFi/NTP 流程期间置 true，抑制时钟重绘，避免 MSG_RTC_UPDATE 闪入 WiFi 文案
-// 归零时机：MSG_NTP_SYNC（成功）或 MSG_WIFI_STATUS（失败/NTP失败）
+// WiFi/NTP 流程期间置 true，抑制时钟重绘
+// 清零时机：MSG_NTP_SYNC（成功）、MSG_WIFI_STATUS（失败）、或空 MSG_WIFI_UI（门户激活后发出）
 static bool g_wifiUiVisible = false;
 
 static constexpr int kTouchIntPin  = -1; // TODO: 设置为真实触摸中断引脚
@@ -158,7 +158,15 @@ static void handleHumiture(float temperature, float humidity) {
 }
 
 static void handleWifiUi(const AppMessage &msg) {
-    // 全屏清除，WiFi 文案居中显示；标记 WiFi UI 激活，抑制时钟重绘
+    // 空消息（line1 & line2 均为空）= 门户激活后的清屏信号 → 切回时钟
+    if (msg.wifiUi.line1[0] == '\0' && msg.wifiUi.line2[0] == '\0') {
+        g_wifiUiVisible = false;
+        gui.clear();
+        resetClockState();
+        return;
+    }
+
+    // 有内容：显示 WiFi/NTP 状态文案，抑制时钟重绘
     g_wifiUiVisible = true;
     gui.clear();
     gui.setFont(&kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20);
@@ -279,6 +287,7 @@ void loop() {
             if (!msg.wifi.connected) Serial.println("WiFi 连接断开");
             if (g_wifiUiVisible) {
                 g_wifiUiVisible = false;
+                gui.clear();
                 resetClockState();
             }
             break;

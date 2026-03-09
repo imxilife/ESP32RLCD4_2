@@ -80,3 +80,15 @@ Currently active fonts:
 
 ### WiFi
 `WiFiConfig` wraps `WiFiManager` (captive-portal provisioning). It posts UI text via a `WiFiMessageCallback` instead of touching `Gui` directly — the callback (`wifiUiMessageHandler` in `main.cpp`) converts to queue messages so the main loop handles all rendering.
+
+#### WiFi UI 状态机（`g_wifiUiVisible` in `main.cpp`）
+
+时钟始终是主界面。WiFi/NTP 状态文案是临时全屏覆盖层，通过以下机制清除：
+
+| 场景 | 清除时机 |
+|------|---------|
+| NTP 同步成功 | `MSG_NTP_SYNC` → 写入 RTC → 立即清屏显示时间 |
+| WiFi 连接失败 | `emitMessage("WiFi连接失败","")` → 延迟 3 秒 → `MSG_WIFI_STATUS` → 清屏显示时间 |
+| 进入配网门户 | `configModeCallback` 显示 AP URL 4 秒 → `emitMessage("","")` → loop 识别空消息 → 清屏显示时间，门户继续后台阻塞（`setConfigPortalTimeout(0)`，无限等待用户配置） |
+
+**空消息约定**：`emitMessage("", "")` 是"清除 WiFi UI 切回时钟"的内部信号。`handleWifiUi` 识别 `line1[0]=='\0' && line2[0]=='\0'` 时执行清屏而非显示。任何新增的 WiFi 流程若需切回时钟，均应以此方式触发，而非直接操作 `g_wifiUiVisible`。
