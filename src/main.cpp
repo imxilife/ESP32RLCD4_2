@@ -13,6 +13,7 @@
 #include <ui_clock.h>
 #include <app_tasks.h>
 #include <Pomodoro.h>
+#include <ui_pomodoro.h>
 #include "fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20.h"
 #include "fonts/Font_chinese_Oswald_Light_28_40.h"
 
@@ -24,7 +25,7 @@ Gui gui(&RlcdPort, 400, 300);
 RTC85063   rtc;
 Humiture   humiture;
 WiFiConfig wifiConfig;
-Pomodoro   pomodoro(gui);
+Pomodoro   pomodoro;
 
 QueueHandle_t g_msgQueue = nullptr;
 
@@ -239,8 +240,8 @@ void setup() {
         attachInterrupt(digitalPinToInterrupt(kButtonIntPin), onButtonISR, FALLING);
     }
 
-    // 番茄时钟按键 GPIO 初始化
-    pomodoro.begin();
+    // 番茄时钟初始化：绑定队列、默认时长 25 分钟、每秒 onTick 一次
+    pomodoro.begin(g_msgQueue, 25 * 60, 1000);
 
     // GPIO4 电池 ADC：配置 11dB 衰减（量程 ~0~3.1V），必须在主核心初始化
     analogSetPinAttenuation(4, ADC_11db);
@@ -259,16 +260,9 @@ void loop() {
         return;
     }
 
-    // ── 番茄时钟：轮询按键 + 倒计时更新 ──────────────────────────
-    bool wasActive = pomodoro.isActive();
+    // ── 番茄时钟：轮询按键 + 驱动状态机（向队列投递 MSG_POMODORO_UPDATE）──
     pomodoro.update();
-    bool nowActive = pomodoro.isActive();
-
-    // 番茄时钟退出 → 清屏并强制时钟重绘
-    if (wasActive && !nowActive) {
-        gui.clear();
-        resetClockState();
-    }
+    bool pomActive = pomodoro.isActive();
 
     // ── 消息队列（50ms 超时，保证按键响应帧率）──────────────────
     AppMessage msg;
@@ -276,11 +270,11 @@ void loop() {
         switch (msg.type) {
         case MSG_RTC_UPDATE:
             // 番茄模式或 WiFi UI 期间抑制时钟重绘
-            if (!nowActive && !g_wifiUiVisible)
+            if (!pomActive && !g_wifiUiVisible)
                 handleRtcUpdate(msg.rtcTime);
             break;
         case MSG_HUMITURE_UPDATE:
-            if (!nowActive)
+            if (!pomActive)
                 handleHumiture(msg.humiture.temp, msg.humiture.hum);
             break;
         case MSG_WIFI_STATUS:
@@ -292,7 +286,7 @@ void loop() {
             }
             break;
         case MSG_WIFI_UI:
-            if (!nowActive)
+            if (!pomActive)
                 handleWifiUi(msg);
             break;
         case MSG_NTP_SYNC: {
@@ -301,7 +295,7 @@ void loop() {
                         msg.ntpTime.hour, msg.ntpTime.minute, msg.ntpTime.second,
                         msg.ntpTime.weekday);
             Serial.println("时间已写入 RTC");
-            if (!nowActive) {
+            if (!pomActive) {
                 g_wifiUiVisible = false;
                 gui.clear();
                 RTCTime t;
@@ -317,6 +311,15 @@ void loop() {
             }
             break;
         }
+        case MSG_POMODORO_UPDATE:
+            if (msg.pomodoro.event == PomodoroEvent::EXIT) {
+                // 退出番茄模式：清屏切回时钟
+                gui.clear();
+                resetClockState();
+            } else {
+                handlePomodoroUpdate(gui, msg);
+            }
+            break;
         case MSG_BATTERY_UPDATE:
             Serial.printf("电池电压: %.2f V\n", msg.battery.voltage);
             break;

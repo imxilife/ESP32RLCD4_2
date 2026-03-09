@@ -3,16 +3,36 @@
 #include <Arduino.h>
 #include <RTC85063.h>
 
-// 应用内消息类型
+// ── Pomodoro 消息 ──────────────────────────────────────────────
+
+enum class PomodoroEvent : uint8_t {
+    SETUP,     // 设置界面刷新
+    TICK,      // 倒计时 tick（remSec / totalSec）
+    FINISHED,  // 倒计时结束，开始闪烁（blinkOn）
+    EXIT,      // 退出番茄时钟，切回时钟界面
+};
+
+struct PomodoroMsg {
+    PomodoroEvent event;
+    union {
+        struct { uint8_t hours; uint8_t minutes; uint8_t focus; } setup;
+        struct { uint32_t remSec; uint32_t totalSec; }           tick;
+        struct { bool blinkOn; }                                  finished;
+    };
+};
+
+// ── 应用消息类型 ───────────────────────────────────────────────
+
 enum MsgType {
     MSG_RTC_UPDATE,      // payload: RTCTime
     MSG_HUMITURE_UPDATE, // payload: float temp, float hum
     MSG_WIFI_STATUS,     // payload: bool connected
-    MSG_WIFI_UI,         // payload: 文本行1/行2，用于 WiFi 配网过程提示
+    MSG_WIFI_UI,         // payload: 文本行1/行2；两行均空 = 清除 WiFi UI 切回时钟
     MSG_NTP_SYNC,        // payload: ntpTime（NTP 同步成功，loop 负责写入 RTC）
     MSG_TOUCH_EVENT,     // payload: int x, int y
     MSG_BUTTON_EVENT,    // payload: int btnId
     MSG_BATTERY_UPDATE,  // payload: float voltage（单位 V）
+    MSG_POMODORO_UPDATE, // payload: PomodoroMsg
 };
 
 // WiFi UI 文本最大长度（UTF-8 字节数上限）
@@ -54,7 +74,9 @@ struct AppMessage {
         } ntpTime;
 
         struct {
-            float voltage; // 换算后电池电压（V）
+            float voltage;
         } battery;
+
+        PomodoroMsg pomodoro;
     };
 };
