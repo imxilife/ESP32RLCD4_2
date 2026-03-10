@@ -18,11 +18,9 @@ pio device monitor
 pio run -e esp32s3box -t upload && pio device monitor
 ```
 
-## Enabling Hardware / Running Tests
+## GUI Tests
 
-Everything in `setup()` is gated behind `#define ENABLE_GUI_TESTS` in [src/main.cpp](src/main.cpp). Set it to `1` to activate RTC init, humiture init, queue creation, and RTOS task spawning. Without it, `setup()` only initialises the LCD and `loop()` exits immediately (queue is null).
-
-`GuiTests::runAllTests(gui)` in [lib/gui_tests/GuiTests.cpp](lib/gui_tests/GuiTests.cpp) exercises all drawing primitives and font rendering on the real display.
+`ENABLE_GUI_TESTS` 宏（默认 `0`）控制 `setup()` 末尾是否运行 `GuiTests::runAllTests(gui)`，用于验证绘图原语和字体渲染。置 `1` 后烧录即可在实机上执行。
 
 ## Font Generation
 
@@ -40,15 +38,21 @@ Generated file naming: `Font_{ascii|chinese}_{FontStem}_{W}_{H}.{cpp,h}`, e.g. `
 ### Hardware
 ESP32-S3-BOX running FreeRTOS. Display is 400×300 monochrome reflective LCD (1bpp) driven over SPI by `DisplayPort` in [lib/display/display_bsp.h](lib/display/display_bsp.h). Pixel index lookup uses a precomputed LUT (`AlgorithmOptimization = 3`). I²C bus: RTC PCF85063 at 0x51 (SDA=GPIO13, SCL=GPIO14); SHTC3 humidity sensor shares the same bus.
 
+按键：KEY1=GPIO18，KEY2=GPIO0（均为低电平有效，内部上拉）。
+
 ### Directory layout
 `src/` contains only the entry point. All reusable code lives in `lib/`:
 
 ```
 src/
-  main.cpp              ← 全局实例、ISR、wifiUiMessageHandler、setup/loop
+  main.cpp              ← 全局实例、ISR、setup/loop（无业务逻辑）
 lib/
   app_message/          ← AppMessage 结构体、MsgType 枚举（跨库共享）
-  app_tasks/            ← FreeRTOS 三个任务：rtcTask、humitureTask、wifiTask
+  app_tasks/            ← FreeRTOS 任务：rtcTask、humitureTask、wifiTask、batteryTask
+  input_key/            ← InputKeyManager（中断+定时器去抖）、KeyEvent
+  state_manager/        ← StateManager、AbstractState、StateId
+  state/                ← MainUIState、PomodoroState、MusicPlayerState、XZAIState
+  pomodoro/             ← Pomodoro 计时逻辑（纯状态机，无 GPIO）
   ui_clock/             ← 时钟/日期绘制：handleRtcUpdate、drawTime、drawDateWeek
   gui/                  ← Gui 绘图 API、Font 系统、fonts/ 字模文件
   display/              ← DisplayPort：SPI 初始化、帧缓冲、RLCD_Display()
@@ -58,8 +62,79 @@ lib/
   gui_tests/            ← GuiTests：绘图原语和字体渲染测试
 ```
 
+### 整体数据流
+
+```
+FreeRTOS Tasks (rtc/humiture/wifi/battery)
+        │  xQueueSend
+        ▼
+   g_msgQueue  ◄── GPIO ISR (touch, 预留)
+        │  xQueueReceive（loop，50ms 超时）
+        ▼
+ stateManager.dispatch(msg)
+        │
+        ▼
+ 当前 State.onMessage()   →  gui_ 绘图（帧缓冲）
+                                   │
+                              gui.display()  ← loop() 末尾唯一刷屏点
+
+GPIO ISR (KEY1/KEY2 FALLING)
+        │
+        ▼
+ InputKeyManager（去抖状态机，FreeRTOS 软件定时器）
+        │  fireEvent()
+        ▼
+ stateManager.dispatchKeyEvent(event)
+        │
+        ▼
+ 当前 State.onKeyEvent()   →  requestTransition() 延迟切换
+```
+
+### 状态机（StateManager + AbstractState）
+
+- **StateManager** (`lib/state_manager/`)：注册子状态、维持当前状态、分发消息和按键事件；在 `dispatch()` / `dispatchKeyEvent()` 末尾执行延迟状态切换（`doTransition()`）。
+- **AbstractState** (`lib/state_manager/AbstractState.h`)：四个纯虚接口 `onEnter/onExit/onMessage/onKeyEvent`；protected `requestTransition(StateId)` 请求切换。
+- **StateId** (`lib/state_manager/StateId.h`)：`MAIN_UI=0, POMODORO=1, MUSIC_PLAYER=2, XZAI=3`。
+
+状态切换循环（KEY1 驱动）：
+```
+MAIN_UI → POMODORO → MUSIC_PLAYER → XZAI → MAIN_UI
+```
+番茄时钟 EXIT 事件 → `MUSIC_PLAYER`；其余状态 KEY1 DOWN → 下一状态。
+
+### 按键子系统（InputKeyManager）
+
+仿 Android InputSubSystem，中断 + FreeRTOS 软件定时器去抖：
+
+```
+IDLE
+  → FALLING ISR → 启动 200ms 去抖定时器 → DEBOUNCING
+DEBOUNCING
+  → 到期，GPIO 仍 LOW → DOWN + 启动 500ms 长按定时器 → PRESSED
+  → 到期，GPIO HIGH  → IDLE（噪声）
+PRESSED
+  → 长按到期，GPIO LOW  → LONG_PRESS + 启动 120ms 自动重载定时器 → LONG_PRESSING
+  → 长按到期，GPIO HIGH → UP → IDLE（短按）
+LONG_PRESSING
+  → 重复定时器到期，GPIO LOW  → LONG_REPEAT（定时器自动重载）
+  → 重复定时器到期，GPIO HIGH → UP → stop timer → IDLE
+```
+
+### 各状态职责
+
+| State | onEnter | onKeyEvent |
+|---|---|---|
+| `MainUIState` | 首次进入启动 4 个后台任务（once-flag）；清屏；resetClockState | KEY1 DOWN → POMODORO |
+| `PomodoroState` | `pomodoro_.enterSetup()` | KEY1 → `onKey1()`；KEY2 → `onKey2Short()` |
+| `MusicPlayerState` | 清屏显示占位文字 | KEY1 DOWN → XZAI |
+| `XZAIState` | 清屏显示占位文字 | KEY1 DOWN → MAIN_UI |
+
+`MainUIState` 还负责：
+- 注册 WiFiConfig 的静态回调（`registerCallbacks(wifiConfig)`，在 `setup()` 调用）
+- `MSG_NTP_SYNC` → `rtc_.setTime(...)` 写入 RTC，再切回时钟显示
+
 ### FreeRTOS message queue pattern
-`g_msgQueue` (defined in `main.cpp`, accessed via `extern` in tasks/ISRs) is the single backbone: all three RTOS tasks and both ISRs post `AppMessage` structs to it; `loop()` is the sole consumer and the only place `gui.display()` is called. Message types are defined in [lib/app_message/app_message.h](lib/app_message/app_message.h).
+`g_msgQueue`（`main.cpp` 定义，`extern` 访问）是唯一数据通道：后台任务和 ISR 发送 `AppMessage`，`loop()` 是唯一消费者，`gui.display()` 是唯一刷屏点。消息类型定义在 [lib/app_message/app_message.h](lib/app_message/app_message.h)。
 
 ### Font system
 `Font` struct ([lib/gui/Font.h](lib/gui/Font.h)) carries:
@@ -79,16 +154,16 @@ Currently active fonts:
 | `kFont18_AlibabaPuHuiTi_3_75_SemiBold` | `Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_18_18` | Weekday (中文) |
 
 ### WiFi
-`WiFiConfig` wraps `WiFiManager` (captive-portal provisioning). It posts UI text via a `WiFiMessageCallback` instead of touching `Gui` directly — the callback (`wifiUiMessageHandler` in `main.cpp`) converts to queue messages so the main loop handles all rendering.
+`WiFiConfig` wraps `WiFiManager` (captive-portal provisioning). 静态回调 `MainUIState::wifiUiMessageHandler` / `ntpSyncHandler` 将事件转为队列消息，由 `loop()` 统一处理渲染，不直接操作 `Gui`。
 
-#### WiFi UI 状态机（`g_wifiUiVisible` in `main.cpp`）
+#### WiFi UI 状态机（`wifiUiVisible_` in `MainUIState`）
 
-时钟始终是主界面。WiFi/NTP 状态文案是临时全屏覆盖层，通过以下机制清除：
+时钟始终是主界面。WiFi/NTP 状态文案是临时全屏覆盖层：
 
 | 场景 | 清除时机 |
 |------|---------|
 | NTP 同步成功 | `MSG_NTP_SYNC` → 写入 RTC → 立即清屏显示时间 |
-| WiFi 连接失败 | `emitMessage("WiFi连接失败","")` → 延迟 3 秒 → `MSG_WIFI_STATUS` → 清屏显示时间 |
-| 进入配网门户 | `configModeCallback` 显示 AP URL 4 秒 → `emitMessage("","")` → loop 识别空消息 → 清屏显示时间，门户继续后台阻塞（`setConfigPortalTimeout(0)`，无限等待用户配置） |
+| WiFi 连接失败 | `emitMessage("WiFi连接失败","")` → 延迟 3 秒 → `MSG_WIFI_STATUS` → 清屏 |
+| 进入配网门户 | `configModeCallback` 显示 AP URL 4 秒 → `emitMessage("","")` → 识别空消息 → 清屏 |
 
-**空消息约定**：`emitMessage("", "")` 是"清除 WiFi UI 切回时钟"的内部信号。`handleWifiUi` 识别 `line1[0]=='\0' && line2[0]=='\0'` 时执行清屏而非显示。任何新增的 WiFi 流程若需切回时钟，均应以此方式触发，而非直接操作 `g_wifiUiVisible`。
+**空消息约定**：`emitMessage("", "")` 是"清除 WiFi UI 切回时钟"的内部信号。`handleWifiUi` 识别 `line1[0]=='\0' && line2[0]=='\0'` 时执行清屏而非显示。
