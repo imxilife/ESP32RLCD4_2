@@ -1,7 +1,5 @@
 #include "Pomodoro.h"
 
-static const uint32_t kFastRepeatMs = 120;  // 长按快速累加间隔
-
 // ── 初始化 ────────────────────────────────────────────────────
 
 void Pomodoro::begin(QueueHandle_t queue, uint32_t defaultSec, uint32_t tickIntervalMs) {
@@ -9,20 +7,12 @@ void Pomodoro::begin(QueueHandle_t queue, uint32_t defaultSec, uint32_t tickInte
     tickIntervalMs_ = tickIntervalMs;
     setH_           = (uint8_t)(defaultSec / 60);
     setM_           = (uint8_t)(defaultSec % 60);
-
-    pinMode(KEY1_PIN, INPUT_PULLUP);
-    pinMode(KEY2_PIN, INPUT_PULLUP);
-    key1Prev_ = (digitalRead(KEY1_PIN) == LOW);
-    key2Prev_ = (digitalRead(KEY2_PIN) == LOW);
-    Serial.printf("[Pomodoro] begin: default=%us tick=%ums KEY1(GPIO%d) KEY2(GPIO%d)\n",
-                  defaultSec, tickIntervalMs, KEY1_PIN, KEY2_PIN);
+    Serial.printf("[Pomodoro] begin: default=%us tick=%ums\n", defaultSec, tickIntervalMs);
 }
 
 // ── 主循环入口 ────────────────────────────────────────────────
 
 void Pomodoro::update() {
-    pollButtons();
-
     switch (state_) {
     case State::IDLE:
     case State::SETUP:
@@ -82,37 +72,7 @@ void Pomodoro::onFinished() {
     postMsg(msg);
 }
 
-// ── 按键轮询 ─────────────────────────────────────────────────
-
-void Pomodoro::pollButtons() {
-    uint32_t now = millis();
-
-    bool k1 = (digitalRead(KEY1_PIN) == LOW);
-    if (k1 && !key1Prev_) onKey1();
-    key1Prev_ = k1;
-
-    bool k2 = (digitalRead(KEY2_PIN) == LOW);
-    if (k2 && !key2Prev_) {
-        key2PressMs_   = now;
-        key2LongFired_ = false;
-    }
-    if (!k2 && key2Prev_ && !key2LongFired_) {
-        onKey2Short();
-    }
-    if (k2 && (now - key2PressMs_ >= LONG_PRESS_MS)) {
-        if (!key2LongFired_) {
-            key2LongFired_ = true;
-            key2RepeatMs_  = now;
-            onKey2Short();
-        } else if (now - key2RepeatMs_ >= kFastRepeatMs) {
-            key2RepeatMs_ = now;
-            onKey2Short();
-        }
-    }
-    key2Prev_ = k2;
-}
-
-// ── 按键事件 ──────────────────────────────────────────────────
+// ── 按键事件（由 PomodoroState::onKeyEvent 注入）────────────────
 
 void Pomodoro::onKey1() {
     switch (state_) {
@@ -183,6 +143,12 @@ void Pomodoro::enterIdle() {
     msg.type           = MSG_POMODORO_UPDATE;
     msg.pomodoro.event = PomodoroEvent::EXIT;
     postMsg(msg);
+}
+
+void Pomodoro::reset() {
+    if (state_ != State::IDLE) {
+        enterIdle();
+    }
 }
 
 // ── 辅助 ─────────────────────────────────────────────────────

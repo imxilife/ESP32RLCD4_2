@@ -9,7 +9,11 @@
       "Bash(python tools/gen_font_digits.py)",
       "Bash(python -c \":*)",
       "Bash(ls d:/ESP32RLCD4_2/*.ttf d:/ESP32RLCD4_2/*.otf d:/ESP32RLCD4_2/*.TTF d:/ESP32RLCD4_2/*.OTF)",
-      "Bash(xargs -I{} basename {})"
+      "Bash(xargs -I{} basename {})",
+      "Bash(mv lib/state_main_ui/* lib/state/)",
+      "Bash(mv lib/state_pomodoro/* lib/state/)",
+      "Bash(mv lib/state_music_player/* lib/state/)",
+      "Bash(mv lib/state_xzai/* lib/state/)"
     ]
   }
 }
