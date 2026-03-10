@@ -24,6 +24,10 @@ void StateManager::dispatch(const AppMessage& msg) {
 }
 
 void StateManager::dispatchKeyEvent(const KeyEvent& event) {
+    if (swallowNextKey_) {
+        swallowNextKey_ = false;
+        return;
+    }
     if (current()) current()->onKeyEvent(event);
     if (transitPending_) {
         transitPending_ = false;
@@ -40,7 +44,8 @@ void StateManager::doTransition(StateId newId) {
     AbstractState* cur = current();
     if (cur) cur->onExit();
 
-    currentId_ = newId;
+    currentId_      = newId;
+    swallowNextKey_ = true;  // 吞掉切换边界上的遗留按键事件
 
     AbstractState* next = current();
     if (next) next->onEnter();

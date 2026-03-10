@@ -36,4 +36,7 @@ private:
 
     AbstractState* current() { return states_[static_cast<int>(currentId_)]; }
     void doTransition(StateId newId);
+
+    // 状态切换后吞掉下一次 dispatchKeyEvent，防止同时按键事件泄漏到新状态
+    bool swallowNextKey_ = false;
 };

@@ -82,12 +82,6 @@ void setup() {
     // WiFi / NTP 回调：注册到 MainUIState 的静态方法
     stateMainUI.registerCallbacks(wifiConfig);
 
-    // 触摸中断（有引脚时启用）
-    if (kTouchIntPin >= 0) {
-        pinMode(kTouchIntPin, INPUT_PULLUP);
-        attachInterrupt(digitalPinToInterrupt(kTouchIntPin), onTouchISR, FALLING);
-    }
-
     // 番茄时钟初始化（绑定队列，不含 GPIO 操作）
     pomodoro.begin(g_msgQueue, 25 * 60, 1000);
 
@@ -112,6 +106,12 @@ void setup() {
     delay(5000);
     gui.clear();
     gui.display();
+
+        // 触摸中断（有引脚时启用）
+    if (kTouchIntPin >= 0) {
+        pinMode(kTouchIntPin, INPUT_PULLUP);
+        attachInterrupt(digitalPinToInterrupt(kTouchIntPin), onTouchISR, FALLING);
+    }
 #endif
 }
 
