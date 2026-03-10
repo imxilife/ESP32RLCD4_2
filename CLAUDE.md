@@ -78,7 +78,7 @@ FreeRTOS Tasks (rtc/humiture/wifi/battery)
                                    │
                               gui.display()  ← loop() 末尾唯一刷屏点
 
-GPIO ISR (KEY1/KEY2 FALLING)
+GPIO ISR (KEY1/KEY2 CHANGE — FALLING+RISING)
         │
         ▼
  InputKeyManager（去抖状态机，FreeRTOS 软件定时器）
@@ -108,17 +108,23 @@ MAIN_UI → POMODORO → MUSIC_PLAYER → XZAI → MAIN_UI
 
 ```
 IDLE
-  → FALLING ISR → 启动 200ms 去抖定时器 → DEBOUNCING
-DEBOUNCING
-  → 到期，GPIO 仍 LOW → DOWN + 启动 500ms 长按定时器 → PRESSED
-  → 到期，GPIO HIGH  → IDLE（噪声）
-PRESSED
-  → 长按到期，GPIO LOW  → LONG_PRESS + 启动 120ms 自动重载定时器 → LONG_PRESSING
-  → 长按到期，GPIO HIGH → UP → IDLE（短按）
-LONG_PRESSING
-  → 重复定时器到期，GPIO LOW  → LONG_REPEAT（定时器自动重载）
-  → 重复定时器到期，GPIO HIGH → UP → stop timer → IDLE
+  → FALLING ISR → 启动 5ms 去抖定时器 → DEBOUNCE
+DEBOUNCE
+  → 到期，GPIO LOW  → DOWN + 启动 500ms 长按定时器 → LONG_PRESS
+  → 到期，GPIO HIGH → IDLE（噪声）
+LONG_PRESS
+  → RISING ISR → UP_PENDING（1ms 定时器立即调度 UP）
+  → 定时器到期，GPIO LOW  → LONG_PRESS 事件 + 启动 120ms 重复定时器 → REPEAT
+  → 定时器到期，GPIO HIGH → UP → IDLE（兜底短按）
+UP_PENDING
+  → 1ms 定时器到期 → UP → IDLE
+REPEAT
+  → RISING ISR → UP_PENDING（1ms 定时器立即调度 UP）
+  → 定时器到期，GPIO LOW  → LONG_REPEAT（定时器自动重载）
+  → 定时器到期，GPIO HIGH → UP → IDLE（兜底）
 ```
+
+中断模式：`CHANGE`（同时捕获 FALLING 和 RISING），按键释放立即感知，消除 LONG_PRESS 窗口期内丢失按键的问题。
 
 ### 各状态职责
 
@@ -150,7 +156,7 @@ Currently active fonts:
 | Variable | File | Use |
 |---|---|---|
 | `kFont_Alibaba72x96` | `Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_72_96` | Large clock digits |
-| `kFont_ascii_Geom_Bold_20_20` | `Font_ascii_Geom_Bold_20_20` | Date (MM/DD) |
+| `kFont_ascii_AlibabaPuHuiTi_3_75_SemiBold_12_18` | `Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_12_18` | Date (MM/DD) |
 | `kFont18_AlibabaPuHuiTi_3_75_SemiBold` | `Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_18_18` | Weekday (中文) |
 
 ### WiFi
@@ -167,3 +173,9 @@ Currently active fonts:
 | 进入配网门户 | `configModeCallback` 显示 AP URL 4 秒 → `emitMessage("","")` → 识别空消息 → 清屏 |
 
 **空消息约定**：`emitMessage("", "")` 是"清除 WiFi UI 切回时钟"的内部信号。`handleWifiUi` 识别 `line1[0]=='\0' && line2[0]=='\0'` 时执行清屏而非显示。
+
+#### NTP 同步实现注意事项
+
+`syncNTP()` 必须用 `sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED`（来自 `<esp_sntp.h>`）等待同步完成，**不能**只依赖 `getLocalTime()` 的返回值。
+
+原因：ESP32 Arduino 的 `getLocalTime()` 内部只检查 `tm_year > 116`（年份 > 2016），软重启后系统时钟由 RTC 域保留，`getLocalTime` 会在 SNTP 未完成时立即返回旧时钟值，导致写入 PCF85063 的时间偏差数分钟（内部 RC 振荡器精度差，可达 ±5%）。

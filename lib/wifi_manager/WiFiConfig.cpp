@@ -1,4 +1,5 @@
 #include "WiFiConfig.h"
+#include <esp_sntp.h>
 
 // 静态成员初始化
 WiFiMessageCallback WiFiConfig::staticMessageCallback = nullptr;
@@ -205,10 +206,10 @@ bool WiFiConfig::syncNTP() {
     configTime(gmtOffset_sec, daylightOffset_sec, ntpServer1, ntpServer2, ntpServer3);
     Serial.printf("NTP 服务器: %s, %s, %s\n", ntpServer1, ntpServer2, ntpServer3);
 
-    struct tm timeinfo;
+    // 等待 SNTP 实际完成同步（不依赖 getLocalTime 的年份检查，避免返回旧系统时钟）
     int retryCount = 0;
     const int maxRetries = 20;  // 10s
-    while (!getLocalTime(&timeinfo) && retryCount < maxRetries) {
+    while (sntp_get_sync_status() != SNTP_SYNC_STATUS_COMPLETED && retryCount < maxRetries) {
         Serial.print(".");
         delay(500);
         retryCount++;
@@ -217,6 +218,13 @@ bool WiFiConfig::syncNTP() {
 
     if (retryCount >= maxRetries) {
         Serial.println("NTP 时间同步失败：超时");
+        emitMessage("NTP sync...", "sync fail...");
+        return false;
+    }
+
+    struct tm timeinfo;
+    if (!getLocalTime(&timeinfo, 1000)) {
+        Serial.println("NTP 时间同步失败：getLocalTime 异常");
         emitMessage("NTP sync...", "sync fail...");
         return false;
     }

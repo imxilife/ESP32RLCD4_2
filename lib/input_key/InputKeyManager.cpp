@@ -23,8 +23,10 @@ void InputKeyManager::begin() {
                           nullptr,
                           timerCb);
 
-    attachInterrupt(digitalPinToInterrupt(KEY1_PIN), isrKey1, FALLING);
-    attachInterrupt(digitalPinToInterrupt(KEY2_PIN), isrKey2, FALLING);
+    // CHANGE 模式同时捕获 FALLING（按下）和 RISING（释放），
+    // 使按键释放能被立即感知，消除 LONG_PRESS 窗口期内丢失按键的问题
+    attachInterrupt(digitalPinToInterrupt(KEY1_PIN), isrKey1, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(KEY2_PIN), isrKey2, CHANGE);
 
     Serial.printf("[InputKey] begin: KEY1=GPIO%d KEY2=GPIO%d\n", KEY1_PIN, KEY2_PIN);
 }
@@ -48,28 +50,43 @@ void InputKeyManager::fireEvent(KeyId id, KeyAction action) {
 #endif
 }
 
-// ── ISR（FALLING 边沿，最小化工作量）────────────────────────
+// ── ISR（CHANGE 模式，同时响应 FALLING 和 RISING）────────────
 
-void IRAM_ATTR InputKeyManager::isrKey1() { onGpioFalling(0); }
-void IRAM_ATTR InputKeyManager::isrKey2() { onGpioFalling(1); }
+void IRAM_ATTR InputKeyManager::isrKey1() { onGpioChange(0); }
+void IRAM_ATTR InputKeyManager::isrKey2() { onGpioChange(1); }
 
-void IRAM_ATTR InputKeyManager::onGpioFalling(int idx) {
+void IRAM_ATTR InputKeyManager::onGpioChange(int idx) {
     if (!instance_) return;
 
     BaseType_t woken = pdFALSE;
+    bool pressed = (digitalRead(instance_->kPins[idx]) == LOW);
 
-    if (instance_->activeKey_ == -1) {
-        // 无活跃按键：认领并启动去抖定时器
-        instance_->activeKey_ = idx;
-        instance_->phase_     = Phase::DEBOUNCE;
-        xTimerChangePeriodFromISR(instance_->timer_, pdMS_TO_TICKS(DEBOUNCE_MS), &woken);
-        // xTimerChangePeriodFromISR 会自动启动定时器
-    } else if (instance_->activeKey_ == idx &&
-               instance_->phase_ == Phase::DEBOUNCE) {
-        // 同一按键在去抖期间再次抖动：重置定时器延长等待
-        xTimerResetFromISR(instance_->timer_, &woken);
+    if (pressed) {
+        // ── FALLING：按键按下 ──────────────────────────────────
+        if (instance_->activeKey_ == -1) {
+            // 无活跃按键：认领并启动去抖定时器
+            instance_->activeKey_ = idx;
+            instance_->phase_     = Phase::DEBOUNCE;
+            xTimerChangePeriodFromISR(instance_->timer_, pdMS_TO_TICKS(DEBOUNCE_MS), &woken);
+        } else if (instance_->activeKey_ == idx && instance_->phase_ == Phase::DEBOUNCE) {
+            // 同一按键在去抖期间再次抖动：重置定时器
+            xTimerResetFromISR(instance_->timer_, &woken);
+        }
+        // LONG_PRESS / REPEAT / UP_PENDING：活跃键未释放或正在收尾，忽略
+    } else {
+        // ── RISING：按键释放 ───────────────────────────────────
+        if (instance_->activeKey_ == idx) {
+            Phase p = instance_->phase_;
+            if (p == Phase::LONG_PRESS || p == Phase::REPEAT) {
+                // 立即调度 UP：切换到 UP_PENDING，用 1ms 定时器在 timer task 派发
+                // （fireEvent 不能在 ISR 直接调用，其监听者可能执行非 ISR 安全操作）
+                instance_->phase_ = Phase::UP_PENDING;
+                xTimerChangePeriodFromISR(instance_->timer_, pdMS_TO_TICKS(1), &woken);
+            }
+            // DEBOUNCE：抖动期内释放，由定时器检查 GPIO 高低判断是否为噪声
+            // UP_PENDING：已在等待派发，忽略
+        }
     }
-    // 其他键按下、或活跃键已进入 LONG_PRESS/REPEAT：忽略
 
     if (woken == pdTRUE) portYIELD_FROM_ISR();
 }
@@ -106,10 +123,16 @@ void InputKeyManager::onTimer() {
             fireEvent(kIds[idx], KeyAction::LONG_PRESS);
             xTimerChangePeriod(timer_, pdMS_TO_TICKS(REPEAT_MS), 0);
         } else {
-            // 长按前释放：短按，派发 UP
+            // 长按前释放（RISING ISR 兜底）：短按，派发 UP
             activeKey_ = -1;
             fireEvent(kIds[idx], KeyAction::UP);
         }
+        break;
+
+    case Phase::UP_PENDING:
+        // RISING ISR 检测到释放后调度的 1ms 定时器到期：派发 UP
+        activeKey_ = -1;
+        fireEvent(kIds[idx], KeyAction::UP);
         break;
 
     case Phase::REPEAT:
@@ -118,7 +141,7 @@ void InputKeyManager::onTimer() {
             fireEvent(kIds[idx], KeyAction::LONG_REPEAT);
             xTimerStart(timer_, 0);
         } else {
-            // 释放：派发 UP，释放活跃槽
+            // 释放（RISING ISR 兜底）：派发 UP，释放活跃槽
             activeKey_ = -1;
             fireEvent(kIds[idx], KeyAction::UP);
         }
