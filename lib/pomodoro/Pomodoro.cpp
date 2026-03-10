@@ -21,7 +21,7 @@ void Pomodoro::update() {
     case State::COUNTDOWN: {
         uint32_t now = millis();
         if (now - lastTickMs_ >= tickIntervalMs_) {
-            lastTickMs_ = now;
+            lastTickMs_ += tickIntervalMs_;
             if (remSec_ > 0) {
                 remSec_--;
                 onTick(remSec_);
