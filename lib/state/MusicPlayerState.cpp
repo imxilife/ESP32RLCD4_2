@@ -13,6 +13,11 @@ void MusicPlayerState::onEnter() {
         initialized = true;
         if (!audio_.begin(16000)) {
             Serial.println("[Audio] Codec init failed — MIC echo unavailable");
+        } else {
+            // Step 1: 验证 ES7210 录音输入链路
+            audio_.diagMicInput(500);
+            // Step 2: 验证 ES8311 音频输出链路
+            audio_.diagSpeakerOutput(500);
         }
     }
 
