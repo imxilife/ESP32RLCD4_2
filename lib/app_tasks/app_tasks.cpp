@@ -9,20 +9,17 @@
 #include <Arduino.h>
 #include <algorithm>
 
-extern RTC85063      rtc;
-extern Humiture      humiture;
-extern WiFiConfig    wifiConfig;
 extern QueueHandle_t g_msgQueue;
 
 void rtcTask(void* pvParameters) {
-    (void)pvParameters;
+    RTC85063* rtc = static_cast<RTC85063*>(pvParameters);
 
     // RTC 初始化（Wire 已在 setup() 中初始化）
-    rtc.begin(13, 14);
+    rtc->begin(13, 14);
 
     while (true) {
-        RTCTime now = rtc.now();
-        rtc.alarmListener();
+        RTCTime now = rtc->now();
+        rtc->alarmListener();
 
         if (g_msgQueue != nullptr) {
             AppMessage msg;
@@ -36,10 +33,10 @@ void rtcTask(void* pvParameters) {
 }
 
 void humitureTask(void* pvParameters) {
-    (void)pvParameters;
+    Humiture* humiture = static_cast<Humiture*>(pvParameters);
 
     // 温湿度传感器初始化，失败时上报错误消息后退出任务
-    if (!humiture.begin()) {
+    if (!humiture->begin()) {
         if (g_msgQueue != nullptr) {
             AppMessage msg;
             msg.type = MSG_WIFI_UI;
@@ -55,7 +52,7 @@ void humitureTask(void* pvParameters) {
 
     while (true) {
         float temperature, humidity;
-        if (humiture.read(temperature, humidity)) {
+        if (humiture->read(temperature, humidity)) {
             if (g_msgQueue != nullptr) {
                 AppMessage msg;
                 msg.type          = MSG_HUMITURE_UPDATE;
@@ -128,11 +125,11 @@ void batteryTask(void* pvParameters) {
 }
 
 void wifiTask(void* pvParameters) {
-    (void)pvParameters;
+    WiFiConfig* wifiConfig = static_cast<WiFiConfig*>(pvParameters);
 
-    wifiConfig.begin();
+    wifiConfig->begin();
 
-    bool lastConnected = wifiConfig.isConnected();
+    bool lastConnected = wifiConfig->isConnected();
 
     if (g_msgQueue != nullptr) {
         AppMessage msg;
@@ -142,7 +139,7 @@ void wifiTask(void* pvParameters) {
     }
 
     while (true) {
-        bool connected = wifiConfig.isConnected();
+        bool connected = wifiConfig->isConnected();
         if (connected != lastConnected && g_msgQueue != nullptr) {
             AppMessage msg;
             msg.type           = MSG_WIFI_STATUS;

@@ -12,14 +12,12 @@
 // g_msgQueue 由 main.cpp 定义，回调静态方法通过 extern 访问
 extern QueueHandle_t g_msgQueue;
 
-MainUIState::MainUIState(Gui& gui, RTC85063& rtc)
-    : gui_(gui), rtc_(rtc) {}
-
-// ── WiFi / NTP 回调注册 ────────────────────────────────────────
-
-void MainUIState::registerCallbacks(WiFiConfig& wifiConfig) {
-    wifiConfig.setMessageCallback(wifiUiMessageHandler);
-    wifiConfig.setNTPCallback(ntpSyncHandler);
+MainUIState::MainUIState(Gui& gui)
+    : gui_(gui) {
+    // WiFi 配网门户与 NTP 同步回调在构造时注册，
+    // 回调内部检查 g_msgQueue != nullptr，时序安全
+    wifiConfig_.setMessageCallback(wifiUiMessageHandler);
+    wifiConfig_.setNTPCallback(ntpSyncHandler);
 }
 
 // ── WiFi UI 文本回调（静态，供 WiFiConfig 注册）────────────────
@@ -57,13 +55,14 @@ void MainUIState::ntpSyncHandler(uint16_t year, uint8_t month, uint8_t day,
 
 void MainUIState::onEnter() {
     // 后台数据任务：只在首次进入主界面时启动一次
+    // pvParameters 传入各自对象指针，任务内部 cast 取用，消除 extern 依赖
     static bool tasksStarted = false;
     if (!tasksStarted) {
         tasksStarted = true;
-        xTaskCreate(rtcTask,      "rtcTask",  2048, nullptr, 2, nullptr);
-        xTaskCreate(humitureTask, "humTask",  2048, nullptr, 1, nullptr);
-        xTaskCreate(wifiTask,     "wifiTask", 8192, nullptr, 2, nullptr);
-        xTaskCreate(batteryTask,  "battTask", 4096, nullptr, 1, nullptr);
+        xTaskCreate(rtcTask,      "rtcTask",  2048, &rtc_,        2, nullptr);
+        xTaskCreate(humitureTask, "humTask",  2048, &humiture_,   1, nullptr);
+        xTaskCreate(wifiTask,     "wifiTask", 8192, &wifiConfig_, 2, nullptr);
+        xTaskCreate(batteryTask,  "battTask", 4096, nullptr,      1, nullptr);
         Serial.println("[MainUI] 后台任务已启动");
     }
 

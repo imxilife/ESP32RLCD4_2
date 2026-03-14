@@ -3,27 +3,27 @@
 #include <AbstractState.h>
 #include <Gui.h>
 #include <RTC85063.h>
+#include <Humiture.h>
 #include <WiFiConfig.h>
 #include <app_message.h>
 
 // 主界面状态：时钟显示、温湿度、WiFi/NTP 状态提示
-// 持有 RTC 引用，负责 NTP 同步后的时间写入（MSG_NTP_SYNC）
+// rtc / humiture / wifiConfig 作为值成员内化，不再依赖 main.cpp 的全局对象
 class MainUIState : public AbstractState {
 public:
-    MainUIState(Gui& gui, RTC85063& rtc);
+    explicit MainUIState(Gui& gui);
 
     void onEnter()                         override;
     void onExit()                          override;
     void onMessage(const AppMessage& msg)  override;
     void onKeyEvent(const KeyEvent& event) override;
 
-    // 向 WiFiConfig 注册 UI 和 NTP 回调（在 setup() 中 g_msgQueue 创建后调用）
-    void registerCallbacks(WiFiConfig& wifiConfig);
-
 private:
-    Gui&      gui_;
-    RTC85063& rtc_;
-    bool      wifiUiVisible_ = false;
+    Gui&       gui_;
+    RTC85063   rtc_;
+    Humiture   humiture_;
+    WiFiConfig wifiConfig_;
+    bool       wifiUiVisible_ = false;
 
     // WiFiConfig 回调（静态方法，通过 extern g_msgQueue 投递消息）
     static void wifiUiMessageHandler(const char* line1, const char* line2);

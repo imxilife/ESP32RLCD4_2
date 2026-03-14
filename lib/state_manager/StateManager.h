@@ -5,6 +5,9 @@
 #include <app_message.h>
 #include <KeyEvent.h>
 
+// 前向声明：beginWithStates 参数类型，避免将具体硬件头文件引入本头文件
+class Gui;
+
 // 状态机管理器：负责子状态注册、状态迁移和事件分发
 // 职责边界：只做调度，不含任何硬件操作
 class StateManager {
@@ -14,6 +17,11 @@ public:
 
     // 启动：设置初始状态并触发 onEnter
     void begin(StateId initialState);
+
+    // 创建并注册本项目全部子状态，然后调用 begin(MAIN_UI)。
+    // 子状态以 static 局部变量形式存活于程序生命周期，由本方法唯一持有。
+    // 在 setup() 中替代逐一构造 + registerState + begin 三段样板代码。
+    void beginWithStates(Gui& gui);
 
     // 将队列消息转发给当前激活状态的 onMessage；
     // 处理完毕后检查是否有待执行的状态迁移
