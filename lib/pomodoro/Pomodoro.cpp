@@ -8,18 +8,43 @@ void Pomodoro::begin(QueueHandle_t queue, uint32_t defaultSec, uint32_t tickInte
     setH_           = (uint8_t)(defaultSec / 60);
     setM_           = (uint8_t)(defaultSec % 60);
     Serial.printf("[Pomodoro] begin: default=%us tick=%ums\n", defaultSec, tickIntervalMs);
+
+    if (tickTimer_ == nullptr) {
+        tickTimer_ = xTimerCreate("pomTick", pdMS_TO_TICKS(100),
+                                  pdTRUE, this, timerCallback);
+    }
 }
 
-// ── 主循环入口 ────────────────────────────────────────────────
+void Pomodoro::timerCallback(TimerHandle_t xTimer) {
+    static_cast<Pomodoro*>(pvTimerGetTimerID(xTimer))->update();
+}
+
+void Pomodoro::startTick() { if (tickTimer_) xTimerStart(tickTimer_, 0); }
+void Pomodoro::stopTick()  { if (tickTimer_) xTimerStop(tickTimer_, 0);  }
+
+// ── 状态生命周期 ──────────────────────────────────────────────
+
+void Pomodoro::enterSetup() {
+    phase_  = Phase::SETUP;
+    focus_  = Focus::HOURS;
+    postSetup();
+}
+
+void Pomodoro::reset() {
+    // 静默回到 SETUP，不发消息（由 PomodoroState::onExit 调用做清理）
+    phase_    = Phase::SETUP;
+    finished_ = false;
+}
+
+// ── 主循环（timerCallback 每 100ms 调用）─────────────────────
 
 void Pomodoro::update() {
-    switch (state_) {
-    case State::IDLE:
-    case State::SETUP:
-        break;
+    if (phase_ != Phase::COUNTDOWN) return;
 
-    case State::COUNTDOWN: {
-        uint32_t now = millis();
+    uint32_t now = millis();
+
+    if (!finished_) {
+        // 倒计时阶段
         if (now - lastTickMs_ >= tickIntervalMs_) {
             lastTickMs_ += tickIntervalMs_;
             if (remSec_ > 0) {
@@ -29,27 +54,22 @@ void Pomodoro::update() {
                 onFinished();
             }
         }
-        break;
-    }
-
-    case State::FINISHED: {
-        uint32_t now = millis();
+    } else {
+        // 闪烁阶段
         if (now - lastBlinkMs_ >= 500) {
             lastBlinkMs_ = now;
             blinkOn_ = !blinkOn_;
 
             AppMessage msg;
-            msg.type                   = MSG_POMODORO_UPDATE;
-            msg.pomodoro.event         = PomodoroEvent::FINISHED;
+            msg.type                      = MSG_POMODORO_UPDATE;
+            msg.pomodoro.event            = PomodoroEvent::FINISHED;
             msg.pomodoro.finished.blinkOn = blinkOn_;
             postMsg(msg);
         }
-        break;
-    }
     }
 }
 
-// ── CountDownTimer 回调 ───────────────────────────────────────
+// ── 倒计时回调 ────────────────────────────────────────────────
 
 void Pomodoro::onTick(uint32_t remSec) {
     AppMessage msg;
@@ -61,7 +81,7 @@ void Pomodoro::onTick(uint32_t remSec) {
 }
 
 void Pomodoro::onFinished() {
-    state_       = State::FINISHED;
+    finished_    = true;
     blinkOn_     = true;
     lastBlinkMs_ = millis();
 
@@ -75,11 +95,9 @@ void Pomodoro::onFinished() {
 // ── 按键事件（由 PomodoroState::onKeyEvent 注入）────────────────
 
 void Pomodoro::onKey1() {
-    switch (state_) {
-    case State::IDLE:
-        enterSetup();
-        break;
-    case State::SETUP:
+    switch (phase_) {
+    case Phase::SETUP:
+        // 循环切换焦点：HOURS → MINUTES → EXIT → START → HOURS
         switch (focus_) {
         case Focus::HOURS:   focus_ = Focus::MINUTES; break;
         case Focus::MINUTES: focus_ = Focus::EXIT;    break;
@@ -88,26 +106,28 @@ void Pomodoro::onKey1() {
         }
         postSetup();
         break;
-    case State::COUNTDOWN:
-    case State::FINISHED:
-        enterIdle();
+
+    case Phase::COUNTDOWN:
+        // 倒计时任意时刻（含闪烁阶段）按 KEY1 → 退出番茄时钟
+        postExit();
         break;
     }
 }
 
 void Pomodoro::onKey2Short() {
-    if (state_ != State::SETUP) return;
+    if (phase_ != Phase::SETUP) return;
+
     switch (focus_) {
     case Focus::HOURS:
         setH_ = (setH_ + 1) % 100;
         postSetup();
         break;
     case Focus::MINUTES:
-        setM_ = (setM_ + 1) % 100;
+        setM_ = (setM_ + 1) % 60;
         postSetup();
         break;
     case Focus::EXIT:
-        enterIdle();
+        postExit();
         break;
     case Focus::START:
         enterCountdown();
@@ -115,51 +135,40 @@ void Pomodoro::onKey2Short() {
     }
 }
 
-// ── 状态切换 ─────────────────────────────────────────────────
-
-void Pomodoro::enterSetup() {
-    state_ = State::SETUP;
-    focus_ = Focus::HOURS;
-    postSetup();
-}
+// ── 状态切换（私有）──────────────────────────────────────────
 
 void Pomodoro::enterCountdown() {
-    uint32_t t = (uint32_t)setH_ * 60u + (uint32_t)setM_;
-    if (t == 0) {
+    uint32_t total = (uint32_t)setH_ * 60u + (uint32_t)setM_;
+    if (total == 0) {
+        // 时长为 0，拒绝开始，焦点移到"秒"字段提示用户
         focus_ = Focus::MINUTES;
         postSetup();
         return;
     }
-    totalSec_   = t;
-    remSec_     = t;
+    phase_      = Phase::COUNTDOWN;
+    finished_   = false;
+    totalSec_   = total;
+    remSec_     = total;
     lastTickMs_ = millis();
-    state_      = State::COUNTDOWN;
-    onTick(remSec_);  // 立即发送初始画面
+    onTick(remSec_);  // 立即刷新倒计时界面
 }
 
-void Pomodoro::enterIdle() {
-    state_ = State::IDLE;
+void Pomodoro::postExit() {
     AppMessage msg;
     msg.type           = MSG_POMODORO_UPDATE;
     msg.pomodoro.event = PomodoroEvent::EXIT;
     postMsg(msg);
 }
 
-void Pomodoro::reset() {
-    if (state_ != State::IDLE) {
-        enterIdle();
-    }
-}
-
 // ── 辅助 ─────────────────────────────────────────────────────
 
 void Pomodoro::postSetup() {
     AppMessage msg;
-    msg.type                    = MSG_POMODORO_UPDATE;
-    msg.pomodoro.event          = PomodoroEvent::SETUP;
-    msg.pomodoro.setup.hours    = setH_;
-    msg.pomodoro.setup.minutes  = setM_;
-    msg.pomodoro.setup.focus    = (uint8_t)focus_;
+    msg.type                   = MSG_POMODORO_UPDATE;
+    msg.pomodoro.event         = PomodoroEvent::SETUP;
+    msg.pomodoro.setup.hours   = setH_;
+    msg.pomodoro.setup.minutes = setM_;
+    msg.pomodoro.setup.focus   = (uint8_t)focus_;
     postMsg(msg);
 }
 

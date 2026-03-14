@@ -22,8 +22,6 @@ Gui gui(&RlcdPort, 400, 300);
 // 容量 16 条 AppMessage，在 setup() 中创建后不再改变
 QueueHandle_t g_msgQueue = nullptr;
 
-// ── 输入与状态机实例 ─────────────────────────────────────────────────────
-
 // 按键驱动：KEY1=GPIO18，KEY2=GPIO0（低电平有效，内部上拉）
 // 中断 + FreeRTOS 软件定时器去抖，产生 KeyEvent 后回调注册的监听器
 InputKeyManager   keyManager;
@@ -33,7 +31,6 @@ InputKeyManager   keyManager;
 StateManager      stateManager;
 
 // ── 触摸中断（预留，待硬件引脚确认后启用）──────────────────────────────
-
 // 触摸屏中断引脚，-1 表示当前未接入
 static constexpr int kTouchIntPin = -1;
 
@@ -113,10 +110,10 @@ void loop() {
         return;
     }
 
-    // 从队列取一条消息（阻塞至多 50ms），转发给当前激活状态处理
-    // 50ms 超时确保即使无消息，刷屏频率也稳定在 ~20 fps
+    // 从队列取一条消息（阻塞至多 30ms），转发给当前激活状态处理
+    // 30ms 超时确保即使无消息，刷屏频率也稳定在 ~30 fps
     AppMessage msg;
-    if (xQueueReceive(g_msgQueue, &msg, pdMS_TO_TICKS(50)) == pdTRUE) {
+    if (xQueueReceive(g_msgQueue, &msg, pdMS_TO_TICKS(30)) == pdTRUE) {
         stateManager.dispatch(msg);
     }
 

@@ -3,7 +3,6 @@
 #include <AbstractState.h>
 #include <Gui.h>
 #include <Pomodoro.h>
-#include <freertos/timers.h>
 
 // 番茄时钟状态：将 InputKeyManager 的按键事件注入 Pomodoro，
 // 接收 MSG_POMODORO_UPDATE 并驱动 UI 渲染。
@@ -19,10 +18,6 @@ public:
     void onKeyEvent(const KeyEvent& event) override;
 
 private:
-    Gui&          gui_;
-    Pomodoro      pomodoro_;
-    TimerHandle_t tickTimer_ = nullptr;
-
-    // FreeRTOS 软件定时器回调：在定时器任务上下文中调用 pomodoro_.update()
-    static void onTick(TimerHandle_t xTimer);
+    Gui&     gui_;
+    Pomodoro pomodoro_;
 };
