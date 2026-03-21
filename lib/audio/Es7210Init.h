@@ -5,3 +5,6 @@
 // Must be called after Wire.begin().
 // Returns true on success.
 bool initEs7210();
+
+// Dump key ES7210 register values to Serial for diagnostic verification.
+void dumpEs7210Regs();
