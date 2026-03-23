@@ -5,43 +5,78 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Build & Flash
 
 ```bash
-# Build
-pio run -e esp32s3box
-
-# Build & upload (115200 baud to reduce "No serial data received" errors)
-pio run -e esp32s3box -t upload
-
-# Serial monitor
-pio device monitor
-
-# Build + upload + monitor in one line
-pio run -e esp32s3box -t upload && pio device monitor
+pio run -e esp32s3box                                # Build
+pio run -e esp32s3box -t upload                      # Build & upload
+pio device monitor                                   # Serial monitor
+pio run -e esp32s3box -t upload && pio device monitor # Build + upload + monitor
 ```
 
 ## GUI Tests
 
-`ENABLE_GUI_TESTS` 宏（默认 `0`）控制 `setup()` 末尾是否运行 `GuiTests::runAllTests(gui)`，用于验证绘图原语和字体渲染。置 `1` 后烧录即可在实机上执行。
+`ENABLE_GUI_TESTS` 宏（默认 `0`）控制 `setup()` 末尾是否运行 `GuiTests::runAllTests(gui)`。置 `1` 后烧录即可在实机上执行。
+
+`ENABLE_SDCARD_TESTS` 宏（默认 `0`）控制 `setup()` 末尾是否运行 `SDCardTests::runAllTests()`。需插入 SD 卡，置 `1` 后烧录，通过 Serial Monitor 查看测试结果。
 
 ## Font Generation
 
 ```bash
-# Interactive CLI — requires Pillow (pip install Pillow)
-python tools/gen_font_digits.py
+python tools/gen_font_digits.py   # Interactive CLI, requires Pillow
 ```
 
-The tool prompts for: mode (ASCII / 中文), TTF/OTF file from the project root, target glyph size (e.g. `18x18`), and character set. It renders via 4× supersampling + LANCZOS resize, shows a terminal preview, then writes `.cpp` + `.h` to `lib/gui/fonts/`. Place TTF/OTF files directly in the project root so the tool can discover them.
-
-Generated file naming: `Font_{ascii|chinese}_{FontStem}_{W}_{H}.{cpp,h}`, e.g. `Font_ascii_Geom_Bold_20_20.h`.
+交互式选择 mode (ASCII/中文)、TTF/OTF 字体文件（放项目根目录）、目标字形尺寸、字符集。4x 超采样 + LANCZOS 缩放，输出到 `lib/gui/fonts/`。命名规则：`Font_{ascii|chinese}_{FontStem}_{W}_{H}.{cpp,h}`。
 
 ## Architecture
 
 ### Hardware
-ESP32-S3-BOX running FreeRTOS. Display is 400×300 monochrome reflective LCD (1bpp) driven over SPI by `DisplayPort` in [lib/display/display_bsp.h](lib/display/display_bsp.h). Pixel index lookup uses a precomputed LUT (`AlgorithmOptimization = 3`). I²C bus: RTC PCF85063 at 0x51 (SDA=GPIO13, SCL=GPIO14); SHTC3 humidity sensor shares the same bus.
 
-按键：KEY1=GPIO18，KEY2=GPIO0（均为低电平有效，内部上拉）。
+ESP32-S3-BOX running FreeRTOS。
+
+| 外设 | 说明 |
+|------|------|
+| Display | 400x300 单色反射式 LCD (1bpp), SPI 驱动, `DisplayPort` in [lib/display/display_bsp.h](lib/display/display_bsp.h) |
+| I2C Bus | SDA=GPIO13, SCL=GPIO14 |
+| RTC | PCF85063 (0x51) |
+| 温湿度 | SHTC3 |
+| MIC ADC | ES7210 (0x40), MIC1+MIC3, PGA 33dB |
+| Speaker DAC | ES8311 (0x18) |
+| PA | GPIO46 高电平使能 |
+| SD Card | SPI2_HOST (HSPI), MOSI=GPIO21, SCK=GPIO38, MISO=GPIO39, CS=GPIO17 |
+| 按键 | KEY1=GPIO18, KEY2=GPIO0（低电平有效，内部上拉） |
+
+### Audio (I2S + Codec)
+
+**I2S 总线（ES7210 和 ES8311 共享）：**
+
+| 信号 | GPIO | 说明 |
+|------|------|------|
+| MCLK | 16 | 4.096 MHz (ESP32 APLL) |
+| BCLK | 9 | 1.024 MHz |
+| WS/LRCK | 45 | 16 kHz 采样率 |
+| DOUT (TX) | 8 | ESP32 → ES8311 (播放) |
+| DIN (RX) | 10 | ES7210 → ESP32 (录音) |
+
+格式：I2S Philips, 16-bit 数据在 32-bit slot 高位, stereo (L=MIC1, R=MIC3)。
+
+**关键设计约束 — 禁止实时回环：**
+
+MIC 和 Speaker 物理距离近，同时工作会形成声学正反馈环路导致啸叫。必须采用**先录后放**模式：
+1. 录音阶段：关闭 PA，采集 MIC 到 PSRAM 缓冲区
+2. 增益处理：16 倍数字放大 (+24dB)，clamp 到 int16 范围
+3. 播放阶段：开启 PA，将缓冲区写入 I2S TX
+
+两阶段物理互斥，从根本上切断反馈环路。API：`AudioCodec::startRecordPlay()` / `stop()`。
+
+**PA 开关时序**：开启时先设 DAC 音量再开 PA；关闭时先关 PA 再 mute DAC（避免 pop 噪声）。操作前调 `i2s_zero_dma_buffer()` 清除 DMA 残留。
+
+**音频调试方法 — 分段隔离验证：**
+
+| 函数 | 验证链路 | 方法 |
+|------|---------|------|
+| `diagMicInput()` | MIC→ESP32 | PA 关闭，读 I2S RX，打印峰值 |
+| `diagSpeakerOutput()` | ESP32→Speaker | 写 1kHz 方波到 I2S TX |
+| `diagRecordThenPlay()` | 先录后放（串行） | 录 2s → 播放 |
 
 ### Directory layout
-`src/` contains only the entry point. All reusable code lives in `lib/`:
 
 ```
 src/
@@ -59,123 +94,66 @@ lib/
   rtc/                  ← PCF85063 驱动
   humiture/             ← SHTC3 温湿度传感器封装
   wifi_manager/         ← WiFiConfig（WiFiManager 封装 + NTP 同步）
+  sdcard/               ← SDCard：SD 卡读写封装（SPI2_HOST）
+  sdcard_tests/         ← SDCardTests：SD 卡挂载/读写/删除测试
   gui_tests/            ← GuiTests：绘图原语和字体渲染测试
 ```
 
-### 整体数据流
+### 数据流
 
 ```
 FreeRTOS Tasks (rtc/humiture/wifi/battery)
         │  xQueueSend
         ▼
-   g_msgQueue  ◄── GPIO ISR (touch, 预留)
+   g_msgQueue  ◄── GPIO ISR
         │  xQueueReceive（loop，50ms 超时）
         ▼
- stateManager.dispatch(msg)
+ stateManager.dispatch(msg) → 当前 State.onMessage() → gui 绘图
+                                                          │
+                                                     gui.display() ← loop() 末尾唯一刷屏点
+
+GPIO ISR (KEY1/KEY2 CHANGE)
         │
-        ▼
- 当前 State.onMessage()   →  gui_ 绘图（帧缓冲）
-                                   │
-                              gui.display()  ← loop() 末尾唯一刷屏点
-
-GPIO ISR (KEY1/KEY2 CHANGE — FALLING+RISING)
-        │
-        ▼
- InputKeyManager（去抖状态机，FreeRTOS 软件定时器）
-        │  fireEvent()
-        ▼
- stateManager.dispatchKeyEvent(event)
-        │
-        ▼
- 当前 State.onKeyEvent()   →  requestTransition() 延迟切换
+ InputKeyManager（去抖状态机）→ stateManager.dispatchKeyEvent() → 当前 State.onKeyEvent()
 ```
 
-### 状态机（StateManager + AbstractState）
+`g_msgQueue` 是唯一数据通道。消息类型定义在 [lib/app_message/app_message.h](lib/app_message/app_message.h)。
 
-- **StateManager** (`lib/state_manager/`)：注册子状态、维持当前状态、分发消息和按键事件；在 `dispatch()` / `dispatchKeyEvent()` 末尾执行延迟状态切换（`doTransition()`）。
-- **AbstractState** (`lib/state_manager/AbstractState.h`)：四个纯虚接口 `onEnter/onExit/onMessage/onKeyEvent`；protected `requestTransition(StateId)` 请求切换。
-- **StateId** (`lib/state_manager/StateId.h`)：`MAIN_UI=0, POMODORO=1, MUSIC_PLAYER=2, XZAI=3`。
+### 状态机
 
-状态切换循环（KEY1 驱动）：
-```
-MAIN_UI → POMODORO → MUSIC_PLAYER → XZAI → MAIN_UI
-```
-番茄时钟 EXIT 事件 → `MUSIC_PLAYER`；其余状态 KEY1 DOWN → 下一状态。
+- **StateManager** (`lib/state_manager/`)：注册子状态、维持当前状态、分发消息和按键事件；`dispatch()` / `dispatchKeyEvent()` 末尾执行延迟状态切换。
+- **AbstractState**：纯虚接口 `onEnter/onExit/onMessage/onKeyEvent`；protected `requestTransition(StateId)`。
+- **StateId**：`MAIN_UI=0, POMODORO=1, MUSIC_PLAYER=2, XZAI=3`。
 
-### 按键子系统（InputKeyManager）
-
-仿 Android InputSubSystem，中断 + FreeRTOS 软件定时器去抖：
-
-```
-IDLE
-  → FALLING ISR → 启动 5ms 去抖定时器 → DEBOUNCE
-DEBOUNCE
-  → 到期，GPIO LOW  → DOWN + 启动 500ms 长按定时器 → LONG_PRESS
-  → 到期，GPIO HIGH → IDLE（噪声）
-LONG_PRESS
-  → RISING ISR → UP_PENDING（1ms 定时器立即调度 UP）
-  → 定时器到期，GPIO LOW  → LONG_PRESS 事件 + 启动 120ms 重复定时器 → REPEAT
-  → 定时器到期，GPIO HIGH → UP → IDLE（兜底短按）
-UP_PENDING
-  → 1ms 定时器到期 → UP → IDLE
-REPEAT
-  → RISING ISR → UP_PENDING（1ms 定时器立即调度 UP）
-  → 定时器到期，GPIO LOW  → LONG_REPEAT（定时器自动重载）
-  → 定时器到期，GPIO HIGH → UP → IDLE（兜底）
-```
-
-中断模式：`CHANGE`（同时捕获 FALLING 和 RISING），按键释放立即感知，消除 LONG_PRESS 窗口期内丢失按键的问题。
-
-### 各状态职责
+状态切换（KEY1 驱动）：`MAIN_UI → POMODORO → MUSIC_PLAYER → XZAI → MAIN_UI`
 
 | State | onEnter | onKeyEvent |
 |---|---|---|
-| `MainUIState` | 首次进入启动 4 个后台任务（once-flag）；清屏；resetClockState | KEY1 DOWN → POMODORO |
+| `MainUIState` | 首次进入启动 4 个后台任务；清屏；resetClockState | KEY1 DOWN → POMODORO |
 | `PomodoroState` | `pomodoro_.enterSetup()` | KEY1 → `onKey1()`；KEY2 → `onKey2Short()` |
-| `MusicPlayerState` | 清屏显示占位文字 | KEY1 DOWN → XZAI |
+| `MusicPlayerState` | 清屏显示占位文字 | KEY1 DOWN → XZAI；KEY2 → 录音 3s → 自动播放 |
 | `XZAIState` | 清屏显示占位文字 | KEY1 DOWN → MAIN_UI |
 
-`MainUIState` 还负责：
-- 注册 WiFiConfig 的静态回调（`registerCallbacks(wifiConfig)`，在 `setup()` 调用）
-- `MSG_NTP_SYNC` → `rtc_.setTime(...)` 写入 RTC，再切回时钟显示
+### 按键子系统（InputKeyManager）
 
-### FreeRTOS message queue pattern
-`g_msgQueue`（`main.cpp` 定义，`extern` 访问）是唯一数据通道：后台任务和 ISR 发送 `AppMessage`，`loop()` 是唯一消费者，`gui.display()` 是唯一刷屏点。消息类型定义在 [lib/app_message/app_message.h](lib/app_message/app_message.h)。
+仿 Android InputSubSystem，中断 + FreeRTOS 软件定时器去抖。中断模式 `CHANGE`（同时捕获 FALLING 和 RISING）。
+
+状态转换：`IDLE → DEBOUNCE(5ms) → LONG_PRESS(500ms) → REPEAT(120ms)`，RISING ISR 触发 `UP_PENDING → UP → IDLE`。
 
 ### Font system
-`Font` struct ([lib/gui/Font.h](lib/gui/Font.h)) carries:
-- `lineHeight` — Y advance between lines
-- `getGlyph(codepoint, &w, &h, &strideBytes, &advanceX, data)` — returns 1bpp bitmap or `nullptr`
-- `fallback` — next font to try when a glyph is missing
 
-All glyph bitmaps are **1bpp row-major, MSB-left**: `bit = data[row * stride + (col >> 3)] >> (7 - (col & 7)) & 1`.
+`Font` struct ([lib/gui/Font.h](lib/gui/Font.h))：`lineHeight`、`getGlyph()`、`fallback` 链。字形位图 1bpp row-major, MSB-left。`Gui::drawText` → `drawTextImpl` 解码 UTF-8，遍历 fallback 链，应用 `GlyphEffect_Apply`。
 
-`Gui::drawText` → `drawTextImpl` decodes UTF-8, walks the fallback chain per codepoint, and applies `GlyphEffect_Apply` for bold/outline before blitting.
-
-Currently active fonts:
-| Variable | File | Use |
-|---|---|---|
-| `kFont_Alibaba72x96` | `Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_72_96` | Large clock digits |
-| `kFont_ascii_AlibabaPuHuiTi_3_75_SemiBold_12_18` | `Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_12_18` | Date (MM/DD) |
-| `kFont18_AlibabaPuHuiTi_3_75_SemiBold` | `Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_18_18` | Weekday (中文) |
+| Variable | Use |
+|---|---|
+| `kFont_Alibaba72x96` | 大号时钟数字 |
+| `kFont_ascii_AlibabaPuHuiTi_3_75_SemiBold_12_18` | 日期 (MM/DD) |
+| `kFont18_AlibabaPuHuiTi_3_75_SemiBold` | 星期 (中文) |
 
 ### WiFi
-`WiFiConfig` wraps `WiFiManager` (captive-portal provisioning). 静态回调 `MainUIState::wifiUiMessageHandler` / `ntpSyncHandler` 将事件转为队列消息，由 `loop()` 统一处理渲染，不直接操作 `Gui`。
 
-#### WiFi UI 状态机（`wifiUiVisible_` in `MainUIState`）
+`WiFiConfig` 封装 `WiFiManager`（captive-portal 配网）。静态回调将事件转为队列消息，由 `loop()` 统一处理。
 
-时钟始终是主界面。WiFi/NTP 状态文案是临时全屏覆盖层：
+WiFi UI 是临时全屏覆盖层，清除后回到时钟。空消息 `emitMessage("","")` 是"清除 WiFi UI"的内部信号。
 
-| 场景 | 清除时机 |
-|------|---------|
-| NTP 同步成功 | `MSG_NTP_SYNC` → 写入 RTC → 立即清屏显示时间 |
-| WiFi 连接失败 | `emitMessage("WiFi连接失败","")` → 延迟 3 秒 → `MSG_WIFI_STATUS` → 清屏 |
-| 进入配网门户 | `configModeCallback` 显示 AP URL 4 秒 → `emitMessage("","")` → 识别空消息 → 清屏 |
-
-**空消息约定**：`emitMessage("", "")` 是"清除 WiFi UI 切回时钟"的内部信号。`handleWifiUi` 识别 `line1[0]=='\0' && line2[0]=='\0'` 时执行清屏而非显示。
-
-#### NTP 同步实现注意事项
-
-`syncNTP()` 必须用 `sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED`（来自 `<esp_sntp.h>`）等待同步完成，**不能**只依赖 `getLocalTime()` 的返回值。
-
-原因：ESP32 Arduino 的 `getLocalTime()` 内部只检查 `tm_year > 116`（年份 > 2016），软重启后系统时钟由 RTC 域保留，`getLocalTime` 会在 SNTP 未完成时立即返回旧时钟值，导致写入 PCF85063 的时间偏差数分钟（内部 RC 振荡器精度差，可达 ±5%）。
+**NTP 注意**：`syncNTP()` 必须用 `sntp_get_sync_status() == SNTP_SYNC_STATUS_COMPLETED` 等待同步完成，不能只依赖 `getLocalTime()`（软重启后会返回旧 RTC 值）。
