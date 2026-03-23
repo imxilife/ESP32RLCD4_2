@@ -10,33 +10,60 @@
 #include <algorithm>
 
 extern QueueHandle_t g_msgQueue;
+extern SemaphoreHandle_t g_i2cMutex;
 
 void rtcTask(void* pvParameters) {
     RTC85063* rtc = static_cast<RTC85063*>(pvParameters);
 
     // RTC 初始化（Wire 已在 setup() 中初始化）
-    rtc->begin(13, 14);
+    if (xSemaphoreTake(g_i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        rtc->begin(13, 14);
+        xSemaphoreGive(g_i2cMutex);
+    }
 
     while (true) {
-        RTCTime now = rtc->now();
-        rtc->alarmListener();
+        if (xSemaphoreTake(g_i2cMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            RTCTime now = rtc->now();
+            rtc->alarmListener();
+            xSemaphoreGive(g_i2cMutex);
 
-        if (g_msgQueue != nullptr) {
-            AppMessage msg;
-            msg.type    = MSG_RTC_UPDATE;
-            msg.rtcTime = now;
-            xQueueSend(g_msgQueue, &msg, 0);
+            if (g_msgQueue != nullptr) {
+                AppMessage msg;
+                msg.type    = MSG_RTC_UPDATE;
+                msg.rtcTime = now;
+                xQueueSend(g_msgQueue, &msg, 0);
+            }
         }
 
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
+// ── 自发热补偿参数 ───────────────────────────────────────────
+// ESP32-S3 SoC 发热通过 PCB 传导至 SHTC3，温度随运行时间升高。
+// 补偿模型：线性插值，开机 0 分钟偏移 0°C，到达稳态后偏移 kMaxCompensation°C。
+// kRampMinutes：从冷启动到热稳态的大致时间（分钟）
+// kMaxCompensation：热稳态时的温度补偿量（°C），需根据实际对比校准器调整
+static constexpr float kMaxCompensation = 4.0f;   // 热稳态补偿（°C），按实测调整
+static constexpr float kRampMinutes     = 30.0f;  // 热爬升时间（分钟）
+
+static float calcThermalCompensation() {
+    float minutesSinceBoot = (float)millis() / 60000.0f;
+    float ratio = minutesSinceBoot / kRampMinutes;
+    if (ratio > 1.0f) ratio = 1.0f;
+    return kMaxCompensation * ratio;
+}
+
 void humitureTask(void* pvParameters) {
     Humiture* humiture = static_cast<Humiture*>(pvParameters);
 
     // 温湿度传感器初始化，失败时上报错误消息后退出任务
-    if (!humiture->begin()) {
+    bool initOk = false;
+    if (xSemaphoreTake(g_i2cMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+        initOk = humiture->begin();
+        xSemaphoreGive(g_i2cMutex);
+    }
+    if (!initOk) {
         if (g_msgQueue != nullptr) {
             AppMessage msg;
             msg.type = MSG_WIFI_UI;
@@ -52,7 +79,18 @@ void humitureTask(void* pvParameters) {
 
     while (true) {
         float temperature, humidity;
-        if (humiture->read(temperature, humidity)) {
+        bool readOk = false;
+
+        if (xSemaphoreTake(g_i2cMutex, pdMS_TO_TICKS(200)) == pdTRUE) {
+            readOk = humiture->read(temperature, humidity);
+            xSemaphoreGive(g_i2cMutex);
+        }
+
+        if (readOk) {
+            // 自发热补偿：减去因 SoC 发热导致的温度偏移
+            float compensation = calcThermalCompensation();
+            temperature -= compensation;
+
             if (g_msgQueue != nullptr) {
                 AppMessage msg;
                 msg.type          = MSG_HUMITURE_UPDATE;
@@ -61,7 +99,9 @@ void humitureTask(void* pvParameters) {
                 xQueueSend(g_msgQueue, &msg, 0);
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(5000));
+
+        // 采样间隔从 5s 增大到 30s，减少传感器自身发热
+        vTaskDelay(pdMS_TO_TICKS(30000));
     }
 }
 

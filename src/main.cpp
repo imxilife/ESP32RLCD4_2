@@ -24,6 +24,9 @@ Gui gui(&RlcdPort, 400, 300);
 // 容量 16 条 AppMessage，在 setup() 中创建后不再改变
 QueueHandle_t g_msgQueue = nullptr;
 
+// I2C 总线互斥锁：RTC / SHTC3 / Codec 等任务共享 Wire，需加锁保护
+SemaphoreHandle_t g_i2cMutex = nullptr;
+
 // 按键驱动：KEY1=GPIO18，KEY2=GPIO0（低电平有效，内部上拉）
 // 中断 + FreeRTOS 软件定时器去抖，产生 KeyEvent 后回调注册的监听器
 InputKeyManager   keyManager;
@@ -57,6 +60,13 @@ void setup() {
 
     // I2C 总线（RTC PCF85063 + 温湿度 SHTC3 + 音频 codec 共用）
     Wire.begin(13, 14);
+
+    // 创建 I2C 互斥锁（必须在任何后台任务启动之前）
+    g_i2cMutex = xSemaphoreCreateMutex();
+    if (g_i2cMutex == nullptr) {
+        Serial.println("创建 I2C 互斥锁失败！");
+        while (1) delay(100);
+    }
 
     // 初始化反射 LCD，清屏并刷新一次确保白底显示
     RlcdPort.RLCD_Init();
