@@ -13,7 +13,9 @@
       "Bash(mv lib/state_main_ui/* lib/state/)",
       "Bash(mv lib/state_pomodoro/* lib/state/)",
       "Bash(mv lib/state_music_player/* lib/state/)",
-      "Bash(mv lib/state_xzai/* lib/state/)"
+      "Bash(mv lib/state_xzai/* lib/state/)",
+      "Bash(grep -r \"mp3\\\\|MP3\\\\|madcodec\\\\|mp3dec\\\\|libmad\" /Users/kelly/CodeRepo/demo/ESP32_RLCD4_2 --include=*.h --include=*.cpp --include=*.ini)",
+      "Bash(curl -sL \"https://raw.githubusercontent.com/lieff/minimp3/master/minimp3.h\" -o /Users/kelly/CodeRepo/demo/ESP32_RLCD4_2/lib/mp3_player/minimp3.h)"
     ]
   }
 }
