@@ -23,6 +23,9 @@ public:
     // 处理按键事件（由 StateManager 从 InputKeyManager 回调转发）
     virtual void onKeyEvent(const KeyEvent& event) = 0;
 
+    // 每帧调用（默认空实现），用于驱动动画等持续性逻辑
+    virtual void tick() {}
+
 protected:
     // 子类调用此方法请求切换到另一状态，切换延迟到当前 dispatch 返回后执行
     void requestTransition(StateId id);

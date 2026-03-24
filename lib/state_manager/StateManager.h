@@ -36,6 +36,9 @@ public:
 
     StateId currentStateId() const { return currentId_; }
 
+    // 每帧调用当前状态的 tick()（驱动 CarouselState 动画等）
+    void tickCurrentState();
+
 private:
     AbstractState* states_[static_cast<int>(StateId::STATE_COUNT)] = {};
     StateId        currentId_      = StateId::MAIN_UI;

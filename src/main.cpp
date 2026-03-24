@@ -141,5 +141,8 @@ void loop() {
         stateManager.dispatch(msg);
     }
 
+    // 驱动当前状态的 tick（CarouselState 动画等）
+    stateManager.tickCurrentState();
+
     gui.display();
 }

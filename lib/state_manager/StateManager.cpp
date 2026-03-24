@@ -4,6 +4,7 @@
 // 具体子状态头文件（依赖各自内化，StateManager 只需知道子状态类型）
 // 硬件头文件由子状态各自 #include，StateManager 无需再引入
 #include <Gui.h>
+#include <CarouselState.h>
 #include <MainUIState.h>
 #include <PomodoroState.h>
 #include <MusicPlayerState.h>
@@ -92,18 +93,24 @@ void StateManager::doTransition(StateId newId) {
 // 各状态所需的硬件对象（rtc/humiture/wifiConfig/pomodoro/audioCodec）
 // 已内化为各自状态的值成员，StateManager 无需再持有或传递这些依赖。
 // 完成注册后调用 begin(MAIN_UI) 触发初始状态的 onEnter。
+void StateManager::tickCurrentState() {
+    if (current()) current()->tick();
+}
+
 void StateManager::beginWithStates(Gui& gui) {
+    static CarouselState    stateCarousel(gui);
     static MainUIState      stateMainUI(gui);
     static PomodoroState    statePomodoro(gui);
     static MusicPlayerState stateMusic(gui);
     static XZAIState        stateXzai(gui);
     static BluetoothState   stateBluetooth(gui);
 
+    registerState(StateId::CAROUSEL,     &stateCarousel);
     registerState(StateId::MAIN_UI,      &stateMainUI);
     registerState(StateId::POMODORO,     &statePomodoro);
     registerState(StateId::MUSIC_PLAYER, &stateMusic);
     registerState(StateId::XZAI,         &stateXzai);
     registerState(StateId::BLUETOOTH,    &stateBluetooth);
 
-    begin(StateId::MAIN_UI);
+    begin(StateId::CAROUSEL);
 }
