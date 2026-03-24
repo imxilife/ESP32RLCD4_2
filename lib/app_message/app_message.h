@@ -33,6 +33,7 @@ enum MsgType {
     MSG_BUTTON_EVENT,    // payload: int btnId
     MSG_BATTERY_UPDATE,  // payload: float voltage（单位 V）
     MSG_POMODORO_UPDATE, // payload: PomodoroMsg
+    MSG_BT_STATUS,       // payload: bool connected（蓝牙连接状态变化）
 };
 
 // WiFi UI 文本最大长度（UTF-8 字节数上限）
@@ -78,5 +79,9 @@ struct AppMessage {
         } battery;
 
         PomodoroMsg pomodoro;
+
+        struct {
+            bool connected;
+        } btStatus;
     };
 };

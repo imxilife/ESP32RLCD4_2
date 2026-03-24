@@ -8,6 +8,7 @@
 #include <PomodoroState.h>
 #include <MusicPlayerState.h>
 #include <XZAIState.h>
+#include <BluetoothState.h>
 
 // ── 1. 注册 ────────────────────────────────────────────────────────────────
 // 注册一个子状态到状态表。
@@ -96,11 +97,13 @@ void StateManager::beginWithStates(Gui& gui) {
     static PomodoroState    statePomodoro(gui);
     static MusicPlayerState stateMusic(gui);
     static XZAIState        stateXzai(gui);
+    static BluetoothState   stateBluetooth(gui);
 
     registerState(StateId::MAIN_UI,      &stateMainUI);
     registerState(StateId::POMODORO,     &statePomodoro);
     registerState(StateId::MUSIC_PLAYER, &stateMusic);
     registerState(StateId::XZAI,         &stateXzai);
+    registerState(StateId::BLUETOOTH,    &stateBluetooth);
 
     begin(StateId::MAIN_UI);
 }

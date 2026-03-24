@@ -4,6 +4,7 @@
 #include <Gui.h>
 #include <GuiTests.h>
 #include <SDCardTests.h>
+#include <BluetoothAudioTests.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <app_message.h>
@@ -13,6 +14,7 @@
 
 #define ENABLE_GUI_TESTS 0
 #define ENABLE_SDCARD_TESTS 0
+#define ENABLE_BT_TESTS 0
 
 // SPI 接口的反射 LCD 控制器（CS=12, DC=11, RST=5, SDA=40, SCL=41, 400×300）
 DisplayPort RlcdPort(12, 11, 5, 40, 41, 400, 300);
@@ -112,6 +114,11 @@ void setup() {
 
 #if ENABLE_SDCARD_TESTS
     SDCardTests::runAllTests();
+    delay(3000);
+#endif
+
+#if ENABLE_BT_TESTS
+    BluetoothAudioTests::runAllTests();
     delay(3000);
 #endif
 }

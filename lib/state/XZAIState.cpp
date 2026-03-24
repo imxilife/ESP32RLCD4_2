@@ -36,7 +36,7 @@ void XZAIState::onMessage(const AppMessage& msg) {
 
 void XZAIState::onKeyEvent(const KeyEvent& event) {
     if (event.id == KeyId::KEY1 && event.action == KeyAction::DOWN) {
-        // 循环的最后一环：切回主界面
-        requestTransition(StateId::MAIN_UI);
+        // 切换到蓝牙状态
+        requestTransition(StateId::BLUETOOTH);
     }
 }

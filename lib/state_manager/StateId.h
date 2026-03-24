@@ -7,5 +7,6 @@ enum class StateId : uint8_t {
     POMODORO     = 1,
     MUSIC_PLAYER = 2,
     XZAI         = 3,
-    STATE_COUNT  = 4,
+    BLUETOOTH    = 4,   // 蓝牙 A2DP 播放
+    STATE_COUNT  = 5,
 };
