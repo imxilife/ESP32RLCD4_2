@@ -1,16 +1,13 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <display_bsp.h>
-#include <Gui.h>
-#include <GuiTests.h>
-#include <SDCardTests.h>
-#include <BluetoothAudioTests.h>
+#include <device/display/display_bsp.h>
+#include <ui/gui/Gui.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
-#include <app_message.h>
+#include <core/app_message/app_message.h>
 
-#include <InputKeyManager.h>
-#include <StateManager.h>
+#include <core/input_key/InputKeyManager.h>
+#include <core/state_manager/StateManager.h>
 
 #define ENABLE_GUI_TESTS 0
 #define ENABLE_SDCARD_TESTS 0

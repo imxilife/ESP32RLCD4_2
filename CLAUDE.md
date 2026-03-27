@@ -95,7 +95,10 @@ lib/
   app_tasks/            ← FreeRTOS 任务：rtcTask、humitureTask、wifiTask、batteryTask
   input_key/            ← InputKeyManager（中断+定时器去抖）、KeyEvent
   state_manager/        ← StateManager、AbstractState、StateId
-  state/                ← MainUIState、PomodoroState、MusicPlayerState、XZAIState
+  state/                ← CarouselState、MainUIState、PomodoroState、MusicPlayerState、XZAIState
+  view/                 ← View 抽象体系：View 基类、CardView、TextView
+  animation/            ← 动画系统：Animation、ScaleAnimation、TranslateAnimation、Interpolator
+  carousel/             ← CarouselController、CardDescriptor（旋转木马卡片动画编排）
   pomodoro/             ← Pomodoro 计时逻辑（纯状态机，无 GPIO）
   ui_clock/             ← 时钟/日期绘制：handleRtcUpdate、drawTime、drawDateWeek
   gui/                  ← Gui 绘图 API、Font 系统、fonts/ 字模文件
@@ -119,8 +122,10 @@ FreeRTOS Tasks (rtc/humiture/wifi/battery)
         │  xQueueReceive（loop，50ms 超时）
         ▼
  stateManager.dispatch(msg) → 当前 State.onMessage() → gui 绘图
-                                                          │
-                                                     gui.display() ← loop() 末尾唯一刷屏点
+        │
+ stateManager.tickCurrentState() → 当前 State.tick()（驱动动画等）
+        │
+   gui.display() ← loop() 末尾唯一刷屏点
 
 GPIO ISR (KEY1/KEY2 CHANGE)
         │
@@ -131,18 +136,38 @@ GPIO ISR (KEY1/KEY2 CHANGE)
 
 ### 状态机
 
-- **StateManager** (`lib/state_manager/`)：注册子状态、维持当前状态、分发消息和按键事件；`dispatch()` / `dispatchKeyEvent()` 末尾执行延迟状态切换。
-- **AbstractState**：纯虚接口 `onEnter/onExit/onMessage/onKeyEvent`；protected `requestTransition(StateId)`。
-- **StateId**：`MAIN_UI=0, POMODORO=1, MUSIC_PLAYER=2, XZAI=3`。
+- **StateManager** (`lib/state_manager/`)：注册子状态、维持当前状态、分发消息和按键事件；`dispatch()` / `dispatchKeyEvent()` 末尾执行延迟状态切换；`tickCurrentState()` 每帧调用当前状态的 `tick()`。
+- **AbstractState**：纯虚接口 `onEnter/onExit/onMessage/onKeyEvent`；`tick()` 虚方法（默认空实现）；protected `requestTransition(StateId)`。
+- **StateId**：`CAROUSEL=0, MAIN_UI=1, POMODORO=2, MUSIC_PLAYER=3, XZAI=4, BLUETOOTH=5`。
 
-状态切换（KEY1 驱动）：`MAIN_UI → POMODORO → MUSIC_PLAYER → XZAI → MAIN_UI`
+**初始状态为 `CarouselState`**（旋转木马主界面），管理所有功能卡片。KEY1 切换卡片并播放缩放+平移动画。
 
-| State | onEnter | onKeyEvent |
-|---|---|---|
-| `MainUIState` | 首次进入启动 4 个后台任务；清屏；resetClockState | KEY1 DOWN → POMODORO |
-| `PomodoroState` | `pomodoro_.enterSetup()` | KEY1 → `onKey1()`；KEY2 → `onKey2Short()` |
-| `MusicPlayerState` | 清屏显示占位文字 | KEY1 DOWN → XZAI；KEY2 → 录音 3s → 自动播放 |
-| `XZAIState` | 清屏显示占位文字 | KEY1 DOWN → MAIN_UI |
+| State | 说明 |
+|---|---|
+| `CarouselState` | **初始状态**。显示卡片列表（时间/Pomodoro/MusicPlay/XZAI），KEY1 循环切换卡片（500ms 动画），时间卡片动态显示 RTC 时间 |
+| `MainUIState` | 时钟界面（保留，当前不作为初始状态） |
+| `PomodoroState` | 番茄钟（保留） |
+| `MusicPlayerState` | 音乐播放（保留） |
+| `XZAIState` | XZAI（保留） |
+
+### 旋转木马动画系统
+
+**View 体系** (`lib/view/`)：Android 风格视图抽象。
+- `View`：基类，包含位置/尺寸/颜色/可见性，按键事件 DOWN→UP 转化为 onClick 回调。
+- `CardView`：圆角矩形卡片，支持 `drawScaled(gui, cx, cy, scale)` 缩放绘制。
+- `TextView`：文本视图。
+
+**动画系统** (`lib/animation/`)：全部 header-only。
+- `Animation`：基类，`start()/tick(deltaMs)/isFinished()`，返回插值进度 [0,1]。
+- `Interpolator`：函数指针类型，内置 `kLinear` 和 `kEaseInOut`（三次缓动）。
+- `ScaleAnimation` / `TranslateAnimation`：缩放和平移动画值计算。
+- `AnimationSet`：并行组合缩放+平移。
+
+**CarouselController** (`lib/carousel/`)：编排多卡片布局和动画。
+- 卡片沿水平方向排列在"槽"中，当前卡片居中 scale=1.0，相邻卡片 scale=0.5。
+- 动画时所有槽平滑左移一个槽位（EaseInOut 插值，500ms）。
+- 完全在屏幕外的卡片跳过绘制（裁剪优化）。
+- `drawStatic()` 绘制静态布局，`tick()` 推进动画并绘制。
 
 ### 按键子系统（InputKeyManager）
 
