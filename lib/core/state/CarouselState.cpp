@@ -21,6 +21,7 @@ void CarouselState::initCards() {
         { "Pomodoro",   240, 140, 10 },  // 卡片1
         { "MusicPlay",  240, 140, 10 },  // 卡片2
         { "XZAI",       240, 140, 10 },  // 卡片3
+        { "OTA",        240, 140, 10 },  // 卡片4
     };
     for (int i = 0; i < kCardCount; i++) {
         carousel_.setCard(i, cards[i]);
@@ -102,6 +103,8 @@ StateId CarouselState::stateForCard(int cardIndex) const {
         return StateId::MUSIC_PLAYER;
     case 3:
         return StateId::XZAI;
+    case 4:
+        return StateId::OTA;
     default:
         return StateId::CAROUSEL;
     }

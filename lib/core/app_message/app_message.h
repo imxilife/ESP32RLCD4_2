@@ -12,6 +12,24 @@ enum class PomodoroEvent : uint8_t {
     EXIT,      // 退出番茄时钟，切回时钟界面
 };
 
+enum class OtaPhase : uint8_t {
+    HOME = 0,
+    CHECKING,
+    CONFIRM,
+    UPDATING,
+    RESULT,
+};
+
+struct OtaStatusMsg {
+    OtaPhase phase;
+    uint8_t progressPercent;
+    bool success;
+    char currentVersion[16];
+    char targetVersion[16];
+    char ip[32];
+    char message[64];
+};
+
 struct PomodoroMsg {
     PomodoroEvent event;
     union {
@@ -34,6 +52,7 @@ enum MsgType {
     MSG_BATTERY_UPDATE,  // payload: float voltage（单位 V）
     MSG_POMODORO_UPDATE, // payload: PomodoroMsg
     MSG_BT_STATUS,       // payload: bool connected（蓝牙连接状态变化）
+    MSG_OTA_STATUS,      // payload: OtaStatusMsg
 };
 
 // WiFi UI 文本最大长度（UTF-8 字节数上限）
@@ -83,5 +102,7 @@ struct AppMessage {
         struct {
             bool connected;
         } btStatus;
+
+        OtaStatusMsg ota;
     };
 };

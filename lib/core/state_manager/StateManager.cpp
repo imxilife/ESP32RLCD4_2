@@ -10,6 +10,8 @@
 #include <core/state/MusicPlayerState.h>
 #include <core/state/XZAIState.h>
 #include <core/state/BluetoothState.h>
+#include <core/state/OtaState.h>
+#include <features/network/NetworkService.h>
 
 // ── 1. 注册 ────────────────────────────────────────────────────────────────
 // 注册一个子状态到状态表。
@@ -98,12 +100,15 @@ void StateManager::tickCurrentState() {
 }
 
 void StateManager::beginWithStates(Gui& gui) {
+    NetworkService::begin();
+
     static CarouselState    stateCarousel(gui);
     static MainUIState      stateMainUI(gui);
     static PomodoroState    statePomodoro(gui);
     static MusicPlayerState stateMusic(gui);
     static XZAIState        stateXzai(gui);
     static BluetoothState   stateBluetooth(gui);
+    static OtaState         stateOta(gui);
 
     registerState(StateId::CAROUSEL,     &stateCarousel);
     registerState(StateId::MAIN_UI,      &stateMainUI);
@@ -111,6 +116,7 @@ void StateManager::beginWithStates(Gui& gui) {
     registerState(StateId::MUSIC_PLAYER, &stateMusic);
     registerState(StateId::XZAI,         &stateXzai);
     registerState(StateId::BLUETOOTH,    &stateBluetooth);
+    registerState(StateId::OTA,          &stateOta);
 
     begin(StateId::CAROUSEL);
 }

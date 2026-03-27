@@ -5,51 +5,12 @@
 #include <device/display/display_bsp.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <freertos/queue.h>
 #include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20.h>
 #include <ui/gui/fonts/Font_chinese_Oswald_Light_28_40.h>
-
-// g_msgQueue 由 main.cpp 定义，回调静态方法通过 extern 访问
-extern QueueHandle_t g_msgQueue;
+#include <features/network/NetworkService.h>
 
 MainUIState::MainUIState(Gui& gui)
-    : gui_(gui) {
-    // WiFi 配网门户与 NTP 同步回调在构造时注册，
-    // 回调内部检查 g_msgQueue != nullptr，时序安全
-    wifiConfig_.setMessageCallback(wifiUiMessageHandler);
-    wifiConfig_.setNTPCallback(ntpSyncHandler);
-}
-
-// ── WiFi UI 文本回调（静态，供 WiFiConfig 注册）────────────────
-
-void MainUIState::wifiUiMessageHandler(const char* line1, const char* line2) {
-    if (g_msgQueue == nullptr) return;
-    AppMessage msg;
-    msg.type = MSG_WIFI_UI;
-    memset(msg.wifiUi.line1, 0, WIFI_UI_LINE_MAX);
-    memset(msg.wifiUi.line2, 0, WIFI_UI_LINE_MAX);
-    if (line1 != nullptr) strncpy(msg.wifiUi.line1, line1, WIFI_UI_LINE_MAX - 1);
-    if (line2 != nullptr) strncpy(msg.wifiUi.line2, line2, WIFI_UI_LINE_MAX - 1);
-    xQueueSend(g_msgQueue, &msg, 0);
-}
-
-// ── NTP 同步回调（静态，供 WiFiConfig 注册）──────────────────
-
-void MainUIState::ntpSyncHandler(uint16_t year, uint8_t month, uint8_t day,
-                                 uint8_t hour, uint8_t minute, uint8_t second,
-                                 uint8_t weekday) {
-    if (g_msgQueue == nullptr) return;
-    AppMessage msg;
-    msg.type            = MSG_NTP_SYNC;
-    msg.ntpTime.year    = year;
-    msg.ntpTime.month   = month;
-    msg.ntpTime.day     = day;
-    msg.ntpTime.hour    = hour;
-    msg.ntpTime.minute  = minute;
-    msg.ntpTime.second  = second;
-    msg.ntpTime.weekday = weekday;
-    xQueueSend(g_msgQueue, &msg, 0);
-}
+    : gui_(gui) {}
 
 // ── 状态生命周期 ──────────────────────────────────────────────
 
@@ -59,10 +20,9 @@ void MainUIState::onEnter() {
     static bool tasksStarted = false;
     if (!tasksStarted) {
         tasksStarted = true;
-        xTaskCreate(rtcTask,      "rtcTask",  2048, &rtc_,        2, nullptr);
-        xTaskCreate(humitureTask, "humTask",  2048, &humiture_,   1, nullptr);
-        xTaskCreate(wifiTask,     "wifiTask", 8192, &wifiConfig_, 2, nullptr);
-        xTaskCreate(batteryTask,  "battTask", 4096, nullptr,      1, nullptr);
+        xTaskCreate(rtcTask,      "rtcTask",  2048, &rtc_,      2, nullptr);
+        xTaskCreate(humitureTask, "humTask",  2048, &humiture_, 1, nullptr);
+        xTaskCreate(batteryTask,  "battTask", 4096, nullptr,    1, nullptr);
         Serial.println("[MainUI] 后台任务已启动");
     }
 

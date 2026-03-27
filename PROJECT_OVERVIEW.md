@@ -1,5 +1,8 @@
 # ESP32_RLCD4_2 Project Overview
 
+> 这是本仓库的项目入门主文档。  
+> 如果只是新开会话想快速知道先看什么，可先看 `AGENTS.md`；如果要真正理解项目，请从本文件开始。
+
 ## 1) 这是什么项目
 
 这是一个基于 **ESP32-S3-BOX + 400x300 单色反射式 LCD** 的嵌入式 UI 项目。  
@@ -102,3 +105,8 @@ pio device monitor
 3. `lib/core/state_manager/`（状态机机制）
 4. `lib/core/state/CarouselState.cpp`（当前主交互）
 5. `platformio.ini`（构建与依赖）
+
+## 8) 扩展阅读
+
+- `docs/PSRAM_RAM_GUIDE.md`：ESP32-S3 中 PSRAM / SRAM 区别、适用场景与本项目建议
+- `docs/OTA_FLOW_GUIDE.md`：OTA 升级流程、关键 API 与本项目实现入口

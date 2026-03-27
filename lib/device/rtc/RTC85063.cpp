@@ -129,7 +129,7 @@ RTCTime RTC85063::now() {
     Wire.endTransmission();
     
     uint8_t buf[7];
-    Wire.requestFrom(PCF85063_ADDR, 7);
+    Wire.requestFrom((uint8_t)PCF85063_ADDR, (uint8_t)7);
     for (int i = 0; i < 7; i++) {
         buf[i] = Wire.available() ? Wire.read() : 0;
     }

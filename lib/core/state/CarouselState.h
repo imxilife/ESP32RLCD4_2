@@ -27,8 +27,8 @@ private:
 
     uint32_t lastTickMs_ = 0;
 
-    static constexpr int kCardCount = 4;
-    // 卡片索引：0=时间, 1=Pomodoro, 2=MusicPlay, 3=XZAI
+    static constexpr int kCardCount = 5;
+    // 卡片索引：0=时间, 1=Pomodoro, 2=MusicPlay, 3=XZAI, 4=OTA
 
     void initCards();
     void updateTimeStr(uint8_t hour, uint8_t minute);
