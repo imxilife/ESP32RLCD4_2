@@ -1,6 +1,6 @@
 #include "BluetoothState.h"
 #include <core/state_manager/StateManager.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20.h>
+#include <ui/gui/fonts/Font_ascii_IBMPlexSans_Medium_20_20.h>
 
 BluetoothState::BluetoothState(Gui& gui) : gui_(gui) {}
 
@@ -47,26 +47,25 @@ void BluetoothState::onKeyEvent(const KeyEvent& event) {
     if (event.action != KeyAction::DOWN) return;
 
     if (event.id == KeyId::KEY1) {
-        requestTransition(StateId::CAROUSEL);
+        requestTransition(StateId::LAUNCH);
     }
     // KEY2 预留
 }
 
 void BluetoothState::drawUI(const char* line1, const char* line2) {
     gui_.clear();
-    gui_.setFont(&kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20);
+    gui_.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
 
-    static const int kFontW   = 20;
     static const int kScreenW = 400;
     static const int kScreenH = 300;
 
-    int x1 = (kScreenW - (int)strlen(line1) * kFontW) / 2;
+    int x1 = (kScreenW - gui_.measureTextWidth(line1)) / 2;
     int y1 = kScreenH / 2 - 30;
     if (x1 < 0) x1 = 0;
     gui_.drawText(x1, y1, line1, ColorBlack, ColorWhite);
 
     if (line2) {
-        int x2 = (kScreenW - (int)strlen(line2) * kFontW) / 2;
+        int x2 = (kScreenW - gui_.measureTextWidth(line2)) / 2;
         int y2 = y1 + 28;
         if (x2 < 0) x2 = 0;
         gui_.drawText(x2, y2, line2, ColorBlack, ColorWhite);

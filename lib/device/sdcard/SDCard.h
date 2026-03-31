@@ -1,12 +1,11 @@
 #pragma once
 #include <Arduino.h>
-#include <SD.h>
-#include <SPI.h>
+#include <sdmmc_cmd.h>
 
 /**
  * SD 卡读写封装
- * 使用 SPI2_HOST (HSPI)，与 Display 的 SPI3_HOST 互不干扰
- * 引脚：MOSI=GPIO21, SCK=GPIO38, MISO=GPIO39, CS=GPIO17
+ * 使用 SDMMC 1-bit 模式，和官方示例保持一致
+ * 引脚：CLK=GPIO38, CMD=GPIO21, D0=GPIO39
  */
 class SDCard {
 public:
@@ -27,11 +26,11 @@ public:
     void listDir(const char* dirname, uint8_t levels = 0);
 
 private:
-    static constexpr int kPinMOSI = 21;
-    static constexpr int kPinSCK  = 38;
-    static constexpr int kPinMISO = 39;
-    static constexpr int kPinCS   = 17;
+    static constexpr int kPinClk = 38;
+    static constexpr int kPinCmd = 21;
+    static constexpr int kPinD0  = 39;
+    static constexpr const char* kMountPoint = "/sdcard";
 
-    SPIClass spi_;
-    bool     mounted_;
+    sdmmc_card_t* card_ = nullptr;
+    bool          mounted_;
 };

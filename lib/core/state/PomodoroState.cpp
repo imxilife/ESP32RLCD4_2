@@ -39,7 +39,7 @@ void PomodoroState::onMessage(const AppMessage& msg) {
     if (msg.type != MSG_POMODORO_UPDATE) return;
 
     if (msg.pomodoro.event == PomodoroEvent::EXIT) {
-        requestTransition(StateId::CAROUSEL);
+        requestTransition(StateId::LAUNCH);
     } else {
         handlePomodoroUpdate(gui_, msg);
     }
@@ -51,7 +51,9 @@ void PomodoroState::onKeyEvent(const KeyEvent& event) {
     switch (event.id) {
     case KeyId::KEY1:
         if (event.action == KeyAction::DOWN) {
-            requestTransition(StateId::CAROUSEL);
+            pomodoro_.onKey1();
+        } else if (event.action == KeyAction::LONG_PRESS) {
+            requestTransition(StateId::LAUNCH);
         }
         break;
     case KeyId::KEY2:

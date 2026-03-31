@@ -108,8 +108,7 @@ void Pomodoro::onKey1() {
         break;
 
     case Phase::COUNTDOWN:
-        // 倒计时任意时刻（含闪烁阶段）按 KEY1 → 退出番茄时钟
-        postExit();
+        // 倒计时阶段忽略短按，退出交给 PomodoroState 的 KEY1 长按处理
         break;
     }
 }

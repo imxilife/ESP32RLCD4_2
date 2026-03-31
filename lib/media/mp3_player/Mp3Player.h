@@ -4,6 +4,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
+#include "minimp3.h"
 
 /**
  * MP3 播放器 —— 从 SD 卡读取 MP3 文件，软解码后通过 I2S/ES8311/PA 播放
@@ -17,14 +18,30 @@
 class Mp3Player {
 public:
     struct Impl;
+    struct TrackMetrics {
+        uint32_t progressMs = 0;
+        uint32_t durationMs = 0;
+        uint32_t sampleRate = 0;
+        uint16_t channels = 0;
+        uint16_t bitrateKbps = 0;
+        size_t fileSizeBytes = 0;
+        bool durationKnown = false;
+        bool metadataReady = false;
+    };
 
     Mp3Player();
     ~Mp3Player();
 
     bool begin();
     bool play(const char* path);
+    bool pause();
+    bool resume();
     void stop();
     bool isPlaying() const { return playing_; }
+    bool isPaused() const { return paused_; }
+    bool hasTrackFinished() const { return trackFinished_; }
+    uint32_t currentProgressMs() const { return trackMetrics_.progressMs; }
+    TrackMetrics trackMetrics() const { return trackMetrics_; }
 
     // 扫描目录下的 .mp3 文件，返回数量
     int scanMp3Files(const char* dir, String names[], int maxCount);
@@ -46,14 +63,20 @@ private:
     uint8_t* readBuf_      = nullptr;
     int      readBufValid_ = 0;
     int      readBufPos_   = 0;
+    int16_t* pcmTemp_      = nullptr;
+    mp3dec_t* decoderState_ = nullptr;
 
     // ── 状态 ──
     Impl*             impl_          = nullptr;
     volatile bool     playing_       = false;
+    volatile bool     paused_        = false;
     volatile bool     stopRequested_ = false;
+    volatile bool     trackFinished_ = false;
     TaskHandle_t      decoderTask_   = nullptr;
     TaskHandle_t      writerTask_    = nullptr;
     int               origSampleRate_ = 16000;
+    volatile uint32_t consumedCompressedBytes_ = 0;
+    TrackMetrics      trackMetrics_  = {};
 
     // ── 任务函数 ──
     static void decoderTaskFunc(void* arg);

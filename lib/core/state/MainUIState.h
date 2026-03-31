@@ -21,10 +21,6 @@ private:
     Gui&       gui_;
     RTC85063   rtc_;
     Humiture   humiture_;
-    bool       wifiUiVisible_ = false;
 
     void handleHumiture(float temp, float hum);
-    void handleWifiUi(const AppMessage& msg);
-
-    static int utf8Count(const char* s);
 };

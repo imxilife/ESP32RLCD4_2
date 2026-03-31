@@ -18,7 +18,7 @@ public:
     // 启动：设置初始状态并触发 onEnter
     void begin(StateId initialState);
 
-    // 创建并注册本项目全部子状态，然后调用 begin(MAIN_UI)。
+    // 创建并注册本项目全部子状态，然后调用 begin(LAUNCH)。
     // 子状态以 static 局部变量形式存活于程序生命周期，由本方法唯一持有。
     // 在 setup() 中替代逐一构造 + registerState + begin 三段样板代码。
     void beginWithStates(Gui& gui);
@@ -36,13 +36,13 @@ public:
 
     StateId currentStateId() const { return currentId_; }
 
-    // 每帧调用当前状态的 tick()（驱动 CarouselState 动画等）
+    // 每帧调用当前状态的 tick()
     void tickCurrentState();
 
 private:
     AbstractState* states_[static_cast<int>(StateId::STATE_COUNT)] = {};
-    StateId        currentId_      = StateId::MAIN_UI;
-    StateId        pendingId_      = StateId::MAIN_UI;
+    StateId        currentId_      = StateId::LAUNCH;
+    StateId        pendingId_      = StateId::LAUNCH;
     bool           transitPending_ = false;
 
     AbstractState* current() { return states_[static_cast<int>(currentId_)]; }

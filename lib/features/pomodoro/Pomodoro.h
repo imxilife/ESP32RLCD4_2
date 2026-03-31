@@ -35,7 +35,7 @@ public:
     void reset();
 
     // ── 按键事件入口（由 PomodoroState::onKeyEvent 调用）──────
-    void onKey1();      // SETUP: 切换焦点；COUNTDOWN: 退出番茄时钟
+    void onKey1();      // SETUP: 切换焦点；COUNTDOWN: 忽略短按
     void onKey2Short(); // SETUP: 执行焦点动作（增量/确认/退出/开始）
 
 private:

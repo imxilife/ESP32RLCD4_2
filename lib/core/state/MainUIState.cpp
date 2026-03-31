@@ -5,7 +5,6 @@
 #include <device/display/display_bsp.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20.h>
 #include <ui/gui/fonts/Font_chinese_Oswald_Light_28_40.h>
 #include <features/network/NetworkService.h>
 
@@ -20,46 +19,38 @@ void MainUIState::onEnter() {
     static bool tasksStarted = false;
     if (!tasksStarted) {
         tasksStarted = true;
-        xTaskCreate(rtcTask,      "rtcTask",  2048, &rtc_,      2, nullptr);
         xTaskCreate(humitureTask, "humTask",  2048, &humiture_, 1, nullptr);
         xTaskCreate(batteryTask,  "battTask", 4096, nullptr,    1, nullptr);
         Serial.println("[MainUI] 后台任务已启动");
     }
 
-    wifiUiVisible_ = false;
     gui_.clear();
     resetClockState();
 }
 
-void MainUIState::onExit() {
-    wifiUiVisible_ = false;
-}
+void MainUIState::onExit() {}
 
 // ── 消息处理 ──────────────────────────────────────────────────
 
 void MainUIState::onMessage(const AppMessage& msg) {
     switch (msg.type) {
     case MSG_RTC_UPDATE:
-        if (!wifiUiVisible_)
-            handleRtcUpdate(msg.rtcTime);
+        handleRtcUpdate(msg.rtcTime);
         break;
 
     case MSG_HUMITURE_UPDATE:
-        if (!wifiUiVisible_)
-            handleHumiture(msg.humiture.temp, msg.humiture.hum);
+        handleHumiture(msg.humiture.temp, msg.humiture.hum);
         break;
 
     case MSG_WIFI_UI:
-        handleWifiUi(msg);
+        Serial.printf("[MainUI] WiFi UI: %s | %s\n",
+                      msg.wifiUi.line1,
+                      msg.wifiUi.line2);
         break;
 
     case MSG_WIFI_STATUS:
-        if (!msg.wifi.connected) Serial.println("[MainUI] WiFi 连接断开");
-        if (wifiUiVisible_) {
-            wifiUiVisible_ = false;
-            gui_.clear();
-            resetClockState();
-        }
+        Serial.printf("[MainUI] WiFi status: connected=%s\n",
+                      msg.wifi.connected ? "true" : "false");
         break;
 
     case MSG_NTP_SYNC:
@@ -68,8 +59,6 @@ void MainUIState::onMessage(const AppMessage& msg) {
                      msg.ntpTime.hour, msg.ntpTime.minute, msg.ntpTime.second,
                      msg.ntpTime.weekday);
         Serial.println("[MainUI] 时间已写入 RTC");
-        // 清除 WiFi UI 覆盖层，切回时钟
-        wifiUiVisible_ = false;
         gui_.clear();
         {
             RTCTime t;
@@ -98,7 +87,7 @@ void MainUIState::onMessage(const AppMessage& msg) {
 
 void MainUIState::onKeyEvent(const KeyEvent& event) {
     if (event.id == KeyId::KEY1 && event.action == KeyAction::DOWN) {
-        requestTransition(StateId::CAROUSEL);
+        requestTransition(StateId::LAUNCH);
     }
 }
 
@@ -161,47 +150,4 @@ void MainUIState::handleHumiture(float temperature, float humidity) {
     }
 }
 
-// ── WiFi UI 显示（从 main.cpp 迁移，空消息约定原样保留）────────
-
-void MainUIState::handleWifiUi(const AppMessage& msg) {
-    // 空消息（line1 & line2 均为空）= 切回时钟信号
-    if (msg.wifiUi.line1[0] == '\0' && msg.wifiUi.line2[0] == '\0') {
-        wifiUiVisible_ = false;
-        gui_.clear();
-        resetClockState();
-        return;
-    }
-
-    wifiUiVisible_ = true;
-    gui_.clear();
-    gui_.setFont(&kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20);
-
-    static const int kFontW   = 20;
-    static const int kFontH   = 20;
-    static const int kLineGap = 8;
-    static const int kScreenW = 400;
-    static const int kScreenH = 300;
-
-    bool hasLine2 = msg.wifiUi.line2[0] != '\0';
-    int  totalH   = hasLine2 ? (kFontH + kLineGap + kFontH) : kFontH;
-    int  startY   = (kScreenH - totalH) / 2;
-
-    if (msg.wifiUi.line1[0] != '\0') {
-        int x = (kScreenW - utf8Count(msg.wifiUi.line1) * kFontW) / 2;
-        if (x < 0) x = 0;
-        gui_.drawText(x, startY, msg.wifiUi.line1, ColorBlack, ColorWhite);
-    }
-    if (hasLine2) {
-        int x = (kScreenW - utf8Count(msg.wifiUi.line2) * kFontW) / 2;
-        if (x < 0) x = 0;
-        gui_.drawText(x, startY + kFontH + kLineGap, msg.wifiUi.line2, ColorBlack, ColorWhite);
-    }
-}
-
 // ── UTF-8 字符计数 ────────────────────────────────────────────
-
-int MainUIState::utf8Count(const char* s) {
-    int n = 0;
-    while (*s) { if ((*s & 0xC0) != 0x80) n++; s++; }
-    return n;
-}

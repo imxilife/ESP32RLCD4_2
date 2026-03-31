@@ -502,6 +502,35 @@ void Gui::drawTextImpl(int x, int y, const char *utf8, const Font *font,
     }
 }
 
+int Gui::measureTextWidth(const char *utf8, const Font *font) const {
+    const Font *activeFont = (font != nullptr) ? font : currentFont_;
+    if (!utf8 || !activeFont) {
+        return 0;
+    }
+
+    int width = 0;
+    const char *p = utf8;
+    uint32_t codepoint = 0;
+    while (DecodeNextUTF8(p, codepoint)) {
+        if (codepoint == '\n') break;
+
+        int w = 0, h = 0, stride = 0, advanceX = 0;
+        const uint8_t *glyph = nullptr;
+        for (const Font *f = activeFont; f != nullptr; f = f->fallback) {
+            if (f->getGlyph) {
+                glyph = f->getGlyph(codepoint, w, h, stride, advanceX, f->data);
+                if (glyph && w > 0 && h > 0 && stride > 0) {
+                    break;
+                }
+            }
+        }
+
+        width += (glyph && advanceX > 0) ? advanceX : 16;
+    }
+
+    return width;
+}
+
 void Gui::drawText(int x, int y, const char *utf8) {
     drawTextImpl(x, y, utf8, currentFont_, fgColor_, bgColor_);
 }
@@ -546,4 +575,3 @@ void Gui::setBigDigitEffectParams(int boldLevel, int outlineWidth) {
 const BigDigitEffectParams &Gui::bigDigitEffectParams() const {
     return bigDigitEffect_;
 }
-

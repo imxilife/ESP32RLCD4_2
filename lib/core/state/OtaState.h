@@ -22,5 +22,11 @@ private:
 
     void draw();
     void drawCenteredText(int y, const char* text);
+    void drawCenteredText(int y, const char* text, const Font* font,
+                          uint8_t fg = ColorBlack, uint8_t bg = ColorWhite);
+    void drawButton(int x, int y, int w, int h, const char* label, bool filled);
+    void drawHintBar(const char* left, const char* right);
+    void drawInfoCard(int x, int y, int w, int h, const char* title, const char* value);
+    void formatIpDisplay(char* out, size_t outSize) const;
     void drawProgressBar(int y, uint8_t percent);
 };

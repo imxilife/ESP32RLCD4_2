@@ -102,6 +102,9 @@ public:
     /// 使用当前字体 + 显式前景/背景色绘制 UTF-8 字符串，自动换行
     void drawText(int x, int y, const char *utf8, uint8_t fgColor, uint8_t bgColor);
 
+    /// 计算 UTF-8 字符串在指定字体下的像素宽度
+    int measureTextWidth(const char *utf8, const Font *font = nullptr) const;
+
     /// 设置大号数字效果参数（加粗、描边），修改后影响后续 drawBigDigits
     void setBigDigitEffectParams(const BigDigitEffectParams &params);
 

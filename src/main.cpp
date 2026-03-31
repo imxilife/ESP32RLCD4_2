@@ -87,10 +87,18 @@ void setup() {
     // 按键管理器初始化，注册监听器将 KeyEvent 转发给状态机
     keyManager.begin();
     keyManager.addListener([](const KeyEvent& e) {
-        stateManager.dispatchKeyEvent(e);
+        if (g_msgQueue == nullptr) return;
+        AppMessage msg = {};
+        msg.type = MSG_KEY_EVENT;
+        msg.key = e;
+        const BaseType_t ok = xQueueSendToFront(g_msgQueue, &msg, pdMS_TO_TICKS(10));
+        if (ok != pdTRUE) {
+            Serial.printf("[InputKey] queue key event failed: id=%d action=%d\n",
+                          static_cast<int>(e.id), static_cast<int>(e.action));
+        }
     });
 
-    // 创建全部子状态、注册并进入初始状态 MAIN_UI（三步合一）
+    // 创建全部子状态、注册并进入初始状态 LAUNCH（三步合一）
     // 各子状态所需硬件对象（rtc/humiture/wifiConfig/pomodoro/audioCodec）
     // 已内化为各自状态的值成员，main.cpp 只需传入共用的 Gui 引用
     stateManager.beginWithStates(gui);
@@ -131,14 +139,26 @@ void loop() {
         return;
     }
 
-    // 从队列取一条消息（阻塞至多 30ms），转发给当前激活状态处理
-    // 30ms 超时确保即使无消息，刷屏频率也稳定在 ~30 fps
+    // 先阻塞等一条消息，随后把当前帧内已积压的消息尽量清空。
+    // 这样 RTC 等高时效消息不会被旧消息压在队列里，避免时间显示滞后数秒。
     AppMessage msg;
     if (xQueueReceive(g_msgQueue, &msg, pdMS_TO_TICKS(30)) == pdTRUE) {
-        stateManager.dispatch(msg);
+        if (msg.type == MSG_KEY_EVENT) {
+            stateManager.dispatchKeyEvent(msg.key);
+        } else {
+            stateManager.dispatch(msg);
+        }
+
+        while (xQueueReceive(g_msgQueue, &msg, 0) == pdTRUE) {
+            if (msg.type == MSG_KEY_EVENT) {
+                stateManager.dispatchKeyEvent(msg.key);
+            } else {
+                stateManager.dispatch(msg);
+            }
+        }
     }
 
-    // 驱动当前状态的 tick（CarouselState 动画等）
+    // 驱动当前状态的 tick
     stateManager.tickCurrentState();
 
     gui.display();

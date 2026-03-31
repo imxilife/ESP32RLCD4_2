@@ -4,7 +4,7 @@
 #include <math.h>
 
 #include <ui/gui/fonts/Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_72_96.h>
-#include <ui/gui/fonts/Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_20_20.h>
+#include <ui/gui/fonts/Font_ascii_IBMPlexSans_Medium_20_20.h>
 #include <ui/gui/fonts/Font_ascii_Oswald_Light_28_40.h>
 #include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20_minsec.h>
 
@@ -73,8 +73,9 @@ static void drawTimeLarge(Gui& gui, uint32_t remSec) {
     gui.drawText(tx, ty, sBuf, ColorBlack, ColorWhite);
     int secX = 200 - (3 * kSmW) / 2;
     int secY = ty + kOsH + 8;
-    gui.setFont(&kFont_ascii_AlibabaPuHuiTi_3_75_SemiBold_20_20);
-    gui.fillRect(secX, secY, 3 * kSmW, kSmH, ColorWhite);
+    gui.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
+    secX = 200 - gui.measureTextWidth("sec", &kFont_ascii_IBMPlexSans_Medium_20_20) / 2;
+    gui.fillRect(secX, secY, gui.measureTextWidth("sec", &kFont_ascii_IBMPlexSans_Medium_20_20), kSmH, ColorWhite);
     gui.drawText(secX, secY, "sec", ColorBlack, ColorWhite);
 }
 
@@ -88,8 +89,9 @@ static void drawTimeSmall(Gui& gui, const char* fmtStr) {
 
 static void drawSetup(Gui& gui, uint8_t setH, uint8_t setM, uint8_t focus) {
     gui.clear();
-    gui.setFont(&kFont_ascii_AlibabaPuHuiTi_3_75_SemiBold_20_20);
-    gui.drawText((400 - 8 * kSmW) / 2, kSetupTitleY, "POMODORO", ColorBlack, ColorWhite);
+    gui.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
+    gui.drawText((400 - gui.measureTextWidth("POMODORO", &kFont_ascii_IBMPlexSans_Medium_20_20)) / 2,
+                 kSetupTitleY, "POMODORO", ColorBlack, ColorWhite);
 
     static const int kTX = (400 - 5 * kBigW) / 2;
     static const int kTY = kSetupTimeY;
@@ -158,12 +160,12 @@ static void drawSetup(Gui& gui, uint8_t setH, uint8_t setM, uint8_t focus) {
     }
 
     // 按钮行
-    gui.setFont(&kFont_ascii_AlibabaPuHuiTi_3_75_SemiBold_20_20);
+    gui.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
 
     // EXIT
     {
         static const int kW  = 4 * kSmW;
-        static const int kTx = 100 - kW / 2;
+        const int kTx = 100 - gui.measureTextWidth("EXIT", &kFont_ascii_IBMPlexSans_Medium_20_20) / 2;
         bool focused = (focus == 2);  // Focus::EXIT
         int rx = kTx - kSetupBtnPad;
         int rw = kW  + 2 * kSetupBtnPad;
@@ -181,7 +183,7 @@ static void drawSetup(Gui& gui, uint8_t setH, uint8_t setM, uint8_t focus) {
     // START
     {
         static const int kW  = 5 * kSmW;
-        static const int kTx = 300 - kW / 2;
+        const int kTx = 300 - gui.measureTextWidth("START", &kFont_ascii_IBMPlexSans_Medium_20_20) / 2;
         bool focused = (focus == 3);  // Focus::START
         int rx = kTx - kSetupBtnPad;
         int rw = kW  + 2 * kSetupBtnPad;
@@ -213,9 +215,9 @@ static void drawFinished(Gui& gui, bool blinkOn) {
     uint8_t bg = blinkOn ? ColorWhite : ColorBlack;
     uint8_t fg = blinkOn ? ColorBlack : ColorWhite;
     gui.fillRect(0, 0, 400, 300, bg);
-    gui.setFont(&kFont_ascii_AlibabaPuHuiTi_3_75_SemiBold_20_20);
-    gui.drawText((400 - 16 * kSmW) / 2, (300 - kSmH) / 2,
-                 "DONE! PRESS KEY1", fg, bg);
+    gui.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
+    gui.drawText((400 - gui.measureTextWidth("DONE! HOLD KEY1", &kFont_ascii_IBMPlexSans_Medium_20_20)) / 2,
+                 (300 - kSmH) / 2, "DONE! HOLD KEY1", fg, bg);
 }
 
 // ── 公共入口 ─────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 #include "app_tasks.h"
 #include <core/app_message/app_message.h>
+#include <core/state_manager/StateManager.h>
 #include <device/rtc/RTC85063.h>
 #include <device/humiture/Humiture.h>
 #include <features/network/WiFiConfig.h>
@@ -11,6 +12,14 @@
 
 extern QueueHandle_t g_msgQueue;
 extern SemaphoreHandle_t g_i2cMutex;
+extern StateManager stateManager;
+
+namespace {
+/**功能: 判断当前激活状态是否为 MAIN_UI，用于裁剪仅主界面关心的周期消息 */
+bool isMainUiActive() {
+    return stateManager.currentStateId() == StateId::MAIN_UI;
+}
+}
 
 void rtcTask(void* pvParameters) {
     RTC85063* rtc = static_cast<RTC85063*>(pvParameters);
@@ -91,7 +100,7 @@ void humitureTask(void* pvParameters) {
             float compensation = calcThermalCompensation();
             temperature -= compensation;
 
-            if (g_msgQueue != nullptr) {
+            if (g_msgQueue != nullptr && isMainUiActive()) {
                 AppMessage msg;
                 msg.type          = MSG_HUMITURE_UPDATE;
                 msg.humiture.temp = temperature;
@@ -152,7 +161,7 @@ void batteryTask(void* pvParameters) {
 
         Serial.printf("[Battery] %.2f V\n", voltage);
 
-        if (g_msgQueue != nullptr) {
+        if (g_msgQueue != nullptr && isMainUiActive()) {
             AppMessage msg;
             msg.type            = MSG_BATTERY_UPDATE;
             msg.battery.voltage = voltage;

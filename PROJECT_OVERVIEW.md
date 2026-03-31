@@ -8,7 +8,7 @@
 这是一个基于 **ESP32-S3-BOX + 400x300 单色反射式 LCD** 的嵌入式 UI 项目。  
 项目核心是一个事件驱动的状态机系统：后台任务采集数据（RTC、温湿度、Wi-Fi/NTP、电池等），主循环统一分发消息并刷新屏幕。
 
-当前主界面是卡片式 Carousel，可进入时钟、番茄钟、音乐等状态。
+当前主界面是 Launch 四宫格首页，可进入时钟、番茄钟、音乐等状态。
 
 ## 2) 为什么要做它
 
@@ -103,10 +103,11 @@ pio device monitor
 1. 本文件 `PROJECT_OVERVIEW.md`
 2. `src/main.cpp`（系统入口与数据流）
 3. `lib/core/state_manager/`（状态机机制）
-4. `lib/core/state/CarouselState.cpp`（当前主交互）
+4. `lib/core/state/LaunchState.cpp`（当前主交互）
 5. `platformio.ini`（构建与依赖）
 
 ## 8) 扩展阅读
 
 - `docs/PSRAM_RAM_GUIDE.md`：ESP32-S3 中 PSRAM / SRAM 区别、适用场景与本项目建议
 - `docs/OTA_FLOW_GUIDE.md`：OTA 升级流程、关键 API 与本项目实现入口
+- `toosls/`：项目相关工具脚本（如字体生成、字模转换等）

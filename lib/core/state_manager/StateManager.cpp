@@ -4,10 +4,11 @@
 // 具体子状态头文件（依赖各自内化，StateManager 只需知道子状态类型）
 // 硬件头文件由子状态各自 #include，StateManager 无需再引入
 #include <ui/gui/Gui.h>
-#include <core/state/CarouselState.h>
+#include <core/state/LaunchState.h>
 #include <core/state/MainUIState.h>
 #include <core/state/PomodoroState.h>
 #include <core/state/MusicPlayerState.h>
+#include <core/state/FontTestState.h>
 #include <core/state/XZAIState.h>
 #include <core/state/BluetoothState.h>
 #include <core/state/OtaState.h>
@@ -94,7 +95,7 @@ void StateManager::doTransition(StateId newId) {
 // 以 static 局部变量创建全部子状态，生命周期与程序相同。
 // 各状态所需的硬件对象（rtc/humiture/wifiConfig/pomodoro/audioCodec）
 // 已内化为各自状态的值成员，StateManager 无需再持有或传递这些依赖。
-// 完成注册后调用 begin(MAIN_UI) 触发初始状态的 onEnter。
+// 完成注册后调用 begin(LAUNCH) 触发初始状态的 onEnter。
 void StateManager::tickCurrentState() {
     if (current()) current()->tick();
 }
@@ -102,21 +103,23 @@ void StateManager::tickCurrentState() {
 void StateManager::beginWithStates(Gui& gui) {
     NetworkService::begin();
 
-    static CarouselState    stateCarousel(gui);
+    static LaunchState      stateLaunch(gui);
     static MainUIState      stateMainUI(gui);
     static PomodoroState    statePomodoro(gui);
     static MusicPlayerState stateMusic(gui);
+    static FontTestState    stateFontTest(gui);
     static XZAIState        stateXzai(gui);
     static BluetoothState   stateBluetooth(gui);
     static OtaState         stateOta(gui);
 
-    registerState(StateId::CAROUSEL,     &stateCarousel);
+    registerState(StateId::LAUNCH,       &stateLaunch);
     registerState(StateId::MAIN_UI,      &stateMainUI);
     registerState(StateId::POMODORO,     &statePomodoro);
     registerState(StateId::MUSIC_PLAYER, &stateMusic);
+    registerState(StateId::FONT_TEST,    &stateFontTest);
     registerState(StateId::XZAI,         &stateXzai);
     registerState(StateId::BLUETOOTH,    &stateBluetooth);
     registerState(StateId::OTA,          &stateOta);
 
-    begin(StateId::CAROUSEL);
+    begin(StateId::LAUNCH);
 }

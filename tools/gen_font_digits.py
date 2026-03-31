@@ -16,11 +16,12 @@ import unicodedata
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
-# 默认 ASCII 字符集：可打印字符 33~126（! 到 ~，共 94 个）
-ASCII_DEFAULT_CHARS = ''.join(chr(i) for i in range(33, 127))
+# 默认 ASCII 字符集：可打印字符 32~126（空格 到 ~，共 95 个）
+ASCII_DEFAULT_CHARS = ''.join(chr(i) for i in range(32, 127))
 
 PROJECT_ROOT      = Path(__file__).parent.parent.absolute()
-FONTS_OUTPUT_DIR  = PROJECT_ROOT / 'lib' / 'gui' / 'fonts'
+# 当前项目字体资源位于 lib/ui/gui/fonts，生成结果默认直接落到这里。
+FONTS_OUTPUT_DIR  = PROJECT_ROOT / 'lib' / 'ui' / 'gui' / 'fonts'
 
 
 # ───────────────────────────── 通用渲染 ─────────────────────────────
@@ -64,9 +65,10 @@ def render_char(ch, target_w, target_h, font_path, threshold=70):
     cropped        = img.crop(bbox)
     glyph_w, glyph_h = cropped.size
 
+    avail_w = target_w - 4
     avail_h = target_h - 4
-    # 始终按高度缩放，保证所有字形视觉等高。
-    ratio = avail_h / glyph_h
+    # 同时约束宽高，避免宽字形（如 0/4/6/8/9）为了撑满高度而被左右裁切。
+    ratio = min(avail_w / glyph_w, avail_h / glyph_h)
     new_w = max(1, round(glyph_w * ratio))
     new_h = max(1, round(glyph_h * ratio))
 
@@ -289,15 +291,17 @@ def select_mode():
 
 
 def find_fonts():
-    """查找项目根目录下的所有字体文件"""
+    """查找项目根目录及 fonts/ 目录下的所有字体文件"""
     seen = set()
     fonts = []
-    for ext in ['*.ttf', '*.otf', '*.TTF', '*.OTF']:
-        for f in glob.glob(str(PROJECT_ROOT / ext)):
-            key = os.path.normcase(os.path.abspath(f))
-            if key not in seen:
-                seen.add(key)
-                fonts.append(f)
+    search_dirs = [PROJECT_ROOT, PROJECT_ROOT / 'fonts']
+    for search_dir in search_dirs:
+        for ext in ['*.ttf', '*.otf', '*.TTF', '*.OTF']:
+            for f in glob.glob(str(search_dir / ext)):
+                key = os.path.normcase(os.path.abspath(f))
+                if key not in seen:
+                    seen.add(key)
+                    fonts.append(f)
     return sorted(fonts)
 
 

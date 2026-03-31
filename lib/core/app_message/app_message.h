@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <core/input_key/KeyEvent.h>
 #include <device/rtc/RTC85063.h>
 
 // ── Pomodoro 消息 ──────────────────────────────────────────────
@@ -48,6 +49,7 @@ enum MsgType {
     MSG_WIFI_UI,         // payload: 文本行1/行2；两行均空 = 清除 WiFi UI 切回时钟
     MSG_NTP_SYNC,        // payload: ntpTime（NTP 同步成功，loop 负责写入 RTC）
     MSG_TOUCH_EVENT,     // payload: int x, int y
+    MSG_KEY_EVENT,       // payload: KeyEvent
     MSG_BUTTON_EVENT,    // payload: int btnId
     MSG_BATTERY_UPDATE,  // payload: float voltage（单位 V）
     MSG_POMODORO_UPDATE, // payload: PomodoroMsg
@@ -83,6 +85,8 @@ struct AppMessage {
             int x;
             int y;
         } touch;
+
+        KeyEvent key;
 
         struct {
             int btnId;
