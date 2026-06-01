@@ -85,6 +85,7 @@ void LaunchState::onEnter() {
     }
 
     focus_ = Focus::TIME;
+    key2LongPressConsumed_ = false;
     timeAnim_.active = false;
     if (hasRtc_) {
         displayedTime_ = currentTime_;
@@ -146,9 +147,7 @@ void LaunchState::onMessage(const AppMessage& msg) {
 }
 
 void LaunchState::onKeyEvent(const KeyEvent& event) {
-    if (event.action != KeyAction::DOWN) return;
-
-    if (event.id == KeyId::KEY1) {
+    if (event.id == KeyId::KEY1 && event.action == KeyAction::DOWN) {
         Focus previous = focus_;
         focus_ = nextFocus(focus_);
         redrawFocus(previous, focus_);
@@ -157,18 +156,19 @@ void LaunchState::onKeyEvent(const KeyEvent& event) {
 
     if (event.id != KeyId::KEY2) return;
 
-    switch (focus_) {
-    case Focus::TIME:
-    case Focus::DATE:
-        requestTransition(StateId::MAIN_UI);
-        break;
-    case Focus::INFO:
-        requestTransition(StateId::POMODORO);
-        break;
-    case Focus::MUSIC:
-        Serial.println("[Launch] Enter MusicPlayerState from MP3 card");
-        requestTransition(StateId::MUSIC_PLAYER);
-        break;
+    if (event.action == KeyAction::LONG_PRESS) {
+        key2LongPressConsumed_ = true;
+        Serial.println("[Launch] Enter FontBinTestState from KEY2 long press");
+        requestTransition(StateId::FONT_BIN_TEST);
+        return;
+    }
+
+    if (event.action == KeyAction::UP) {
+        if (key2LongPressConsumed_) {
+            key2LongPressConsumed_ = false;
+            return;
+        }
+        activateFocusedCard();
     }
 }
 
@@ -503,6 +503,24 @@ void LaunchState::drawCardByFocus(Focus focus) {
         break;
     case Focus::MUSIC:
         drawMusicCard();
+        break;
+    }
+}
+
+void LaunchState::activateFocusedCard() {
+    // KEY2 short press is handled on UP so a long press can be reserved for
+    // diagnostics without entering the focused card first.
+    switch (focus_) {
+    case Focus::TIME:
+    case Focus::DATE:
+        requestTransition(StateId::MAIN_UI);
+        break;
+    case Focus::INFO:
+        requestTransition(StateId::POMODORO);
+        break;
+    case Focus::MUSIC:
+        Serial.println("[Launch] Enter MusicPlayerState from MP3 card");
+        requestTransition(StateId::MUSIC_PLAYER);
         break;
     }
 }

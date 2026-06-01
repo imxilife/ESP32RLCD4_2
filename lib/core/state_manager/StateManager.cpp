@@ -9,6 +9,7 @@
 #include <core/state/PomodoroState.h>
 #include <core/state/MusicPlayerState.h>
 #include <core/state/FontTestState.h>
+#include <core/state/FontBinTestState.h>
 #include <core/state/XZAIState.h>
 #include <core/state/BluetoothState.h>
 #include <core/state/OtaState.h>
@@ -108,6 +109,7 @@ void StateManager::beginWithStates(Gui& gui) {
     static PomodoroState    statePomodoro(gui);
     static MusicPlayerState stateMusic(gui);
     static FontTestState    stateFontTest(gui);
+    static FontBinTestState stateFontBinTest(gui);
     static XZAIState        stateXzai(gui);
     static BluetoothState   stateBluetooth(gui);
     static OtaState         stateOta(gui);
@@ -117,6 +119,7 @@ void StateManager::beginWithStates(Gui& gui) {
     registerState(StateId::POMODORO,     &statePomodoro);
     registerState(StateId::MUSIC_PLAYER, &stateMusic);
     registerState(StateId::FONT_TEST,    &stateFontTest);
+    registerState(StateId::FONT_BIN_TEST, &stateFontBinTest);
     registerState(StateId::XZAI,         &stateXzai);
     registerState(StateId::BLUETOOTH,    &stateBluetooth);
     registerState(StateId::OTA,          &stateOta);

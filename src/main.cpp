@@ -1,7 +1,9 @@
 #include <Arduino.h>
+#include <SPIFFS.h>
 #include <Wire.h>
 #include <device/display/display_bsp.h>
 #include <ui/gui/Gui.h>
+#include <ui/gui/fonts/Font24Spiffs.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <core/app_message/app_message.h>
@@ -73,6 +75,15 @@ void setup() {
     gui.setBackgroundColor(ColorWhite);
     gui.clear();
     gui.display();
+
+    // SPIFFS 字库属于可选资源：初始化失败不阻塞主流程，测试页会显示缺字占位。
+    if (!SPIFFS.begin(false)) {
+        Serial.println("[Font24] SPIFFS mount failed");
+    } else if (!gFont24Spiffs.begin(SPIFFS, "/font24.bin")) {
+        Serial.printf("[Font24] init failed: %s\n", gFont24Spiffs.lastError());
+    } else {
+        Serial.println("[Font24] /font24.bin ready");
+    }
 
     // 创建全局消息队列（容量 16），后台任务和 ISR 通过它向 loop() 传递数据
     g_msgQueue = xQueueCreate(16, sizeof(AppMessage));

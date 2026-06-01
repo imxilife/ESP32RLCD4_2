@@ -29,6 +29,7 @@ private:
     RTCTime displayedTime_ = {};
     Focus focus_ = Focus::TIME;
     bool hasRtc_ = false;
+    bool key2LongPressConsumed_ = false;
 
     struct TimeScrollAnimation {
         bool active = false;
@@ -87,6 +88,7 @@ private:
     void drawInfoCard();
     void drawMusicCard();
     void drawCardByFocus(Focus focus);
+    void activateFocusedCard();
     Focus nextFocus(Focus focus) const;
 
     void formatTimeDigits(char out[5], uint8_t hour, uint8_t minute) const;
