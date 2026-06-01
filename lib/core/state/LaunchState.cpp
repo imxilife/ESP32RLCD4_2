@@ -82,6 +82,7 @@ void LaunchState::onEnter() {
 
     startBatteryTaskOnce();
     voicePhase_ = VoiceAssistantService::phase();
+    key2LongPressConsumed_ = false;
     draw();
 }
 
@@ -131,7 +132,22 @@ void LaunchState::onMessage(const AppMessage& msg) {
 }
 
 void LaunchState::onKeyEvent(const KeyEvent& event) {
-    (void)event;
+    // KEY2 long press is reserved as a diagnostics shortcut to the SPIFFS font test.
+    if (event.id != KeyId::KEY2) return;
+
+    if (event.action == KeyAction::LONG_PRESS) {
+        key2LongPressConsumed_ = true;
+        Serial.println("[Launch] Enter FontBinTestState from KEY2 long press");
+        requestTransition(StateId::FONT_BIN_TEST);
+        return;
+    }
+
+    if (event.action == KeyAction::UP) {
+        if (key2LongPressConsumed_) {
+            key2LongPressConsumed_ = false;
+            return;
+        }
+    }
 }
 
 void LaunchState::tick() {}

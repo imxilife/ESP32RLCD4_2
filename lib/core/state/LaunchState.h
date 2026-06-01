@@ -25,6 +25,7 @@ private:
     float batteryVoltage_ = 0.0f;
     WeatherStatusMsg weather_ = {};
     VoiceAssistantPhase voicePhase_ = VoiceAssistantPhase::IDLE;
+    bool key2LongPressConsumed_ = false;
 
     void draw();
     void drawShell();
