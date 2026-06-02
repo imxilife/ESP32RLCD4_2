@@ -15,10 +15,18 @@ extern SemaphoreHandle_t g_i2cMutex;
 extern StateManager stateManager;
 
 namespace {
+bool g_batteryTaskStarted = false;
 /**功能: 判断当前激活状态是否为 MAIN_UI，用于裁剪仅主界面关心的周期消息 */
 bool isMainUiActive() {
-    return stateManager.currentStateId() == StateId::MAIN_UI;
+    const StateId id = stateManager.currentStateId();
+    return id == StateId::LAUNCH || id == StateId::MAIN_UI;
 }
+}
+
+void startBatteryTaskOnce() {
+    if (g_batteryTaskStarted) return;
+    g_batteryTaskStarted = true;
+    xTaskCreate(batteryTask, "battTask", 4096, nullptr, 1, nullptr);
 }
 
 void rtcTask(void* pvParameters) {

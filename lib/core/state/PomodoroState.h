@@ -18,6 +18,5 @@ public:
     void onKeyEvent(const KeyEvent& event) override;
 
 private:
-    Gui&     gui_;
-    Pomodoro pomodoro_;
+    Gui& gui_;
 };

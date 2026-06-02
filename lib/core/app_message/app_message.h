@@ -55,10 +55,37 @@ enum MsgType {
     MSG_POMODORO_UPDATE, // payload: PomodoroMsg
     MSG_BT_STATUS,       // payload: bool connected（蓝牙连接状态变化）
     MSG_OTA_STATUS,      // payload: OtaStatusMsg
+    MSG_WEATHER_UPDATE,  // payload: WeatherStatusMsg
+    MSG_MEMO_UPDATE,     // payload: MemoUpdateMsg
+    MSG_VOICE_ASSISTANT_UPDATE, // payload: VoiceAssistantStatusMsg
 };
 
 // WiFi UI 文本最大长度（UTF-8 字节数上限）
 static const size_t WIFI_UI_LINE_MAX = 64;
+static const size_t WEATHER_TEXT_MAX = 24;
+static const size_t MEMO_TEXT_MAX    = 64;
+
+enum class VoiceAssistantPhase : uint8_t {
+    IDLE = 0,
+    LISTENING,
+    PROCESSING,
+};
+
+struct WeatherStatusMsg {
+    bool valid;
+    int16_t temperatureC;
+    uint16_t iconCode;
+    uint32_t updatedAtMs;
+    char text[WEATHER_TEXT_MAX];
+};
+
+struct MemoUpdateMsg {
+    uint8_t count;
+};
+
+struct VoiceAssistantStatusMsg {
+    VoiceAssistantPhase phase;
+};
 
 // 应用内统一消息结构
 struct AppMessage {
@@ -108,5 +135,11 @@ struct AppMessage {
         } btStatus;
 
         OtaStatusMsg ota;
+
+        WeatherStatusMsg weather;
+
+        MemoUpdateMsg memo;
+
+        VoiceAssistantStatusMsg voiceAssistant;
     };
 };

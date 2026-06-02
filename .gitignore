@@ -2,3 +2,5 @@
 .vscode
 test/
 .idea
+secrets.ini
+__pycache__/

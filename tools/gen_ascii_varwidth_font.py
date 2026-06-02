@@ -185,6 +185,7 @@ def generate_font(font_path, font_size, target_h, threshold):
 def main():
     configs = [
         (PROJECT_ROOT / "fonts" / "IBMPlexSans-Medium.ttf", 23, 24, 150),
+        (PROJECT_ROOT / "fonts" / "AlibabaPuHuiTi-3-75-SemiBold.ttf", 16, 18, 140),
         (PROJECT_ROOT / "fonts" / "AlibabaPuHuiTi-3-75-SemiBold.ttf", 21, 24, 140),
     ]
     for font_path, font_size, target_h, threshold in configs:

@@ -36,6 +36,19 @@ void Pomodoro::reset() {
     finished_ = false;
 }
 
+Pomodoro::Snapshot Pomodoro::snapshot() const {
+    Snapshot snap;
+    snap.running = (phase_ == Phase::COUNTDOWN);
+    snap.finished = finished_;
+    snap.remSec = snap.running ? remSec_ : ((uint32_t)setH_ * 60u + (uint32_t)setM_);
+    snap.totalSec = snap.running ? totalSec_ : snap.remSec;
+    if (snap.totalSec == 0) {
+        snap.remSec = 25 * 60;
+        snap.totalSec = 25 * 60;
+    }
+    return snap;
+}
+
 // ── 主循环（timerCallback 每 100ms 调用）─────────────────────
 
 void Pomodoro::update() {
@@ -173,4 +186,11 @@ void Pomodoro::postSetup() {
 
 void Pomodoro::postMsg(AppMessage& msg) {
     if (queue_) xQueueSend(queue_, &msg, 0);
+}
+
+namespace PomodoroService {
+Pomodoro& instance() {
+    static Pomodoro g_pomodoro;
+    return g_pomodoro;
+}
 }

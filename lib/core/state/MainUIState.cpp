@@ -20,7 +20,7 @@ void MainUIState::onEnter() {
     if (!tasksStarted) {
         tasksStarted = true;
         xTaskCreate(humitureTask, "humTask",  2048, &humiture_, 1, nullptr);
-        xTaskCreate(batteryTask,  "battTask", 4096, nullptr,    1, nullptr);
+        startBatteryTaskOnce();
         Serial.println("[MainUI] 后台任务已启动");
     }
 

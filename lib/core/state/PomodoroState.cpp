@@ -16,21 +16,21 @@ void PomodoroState::onEnter() {
     static bool initialized = false;
     if (!initialized) {
         initialized = true;
-        pomodoro_.begin(g_msgQueue, 25 * 60, 1000);
+        PomodoroService::instance().begin(g_msgQueue, 25 * 60, 1000);
     }
 
-    pomodoro_.startTick();
+    PomodoroService::instance().startTick();
 
     // 直接进入设置界面，无需再等待 KEY1 触发
-    pomodoro_.enterSetup();
+    PomodoroService::instance().enterSetup();
 }
 
 void PomodoroState::onExit() {
     // 停止节拍定时器，避免在其他状态中继续触发
-    pomodoro_.stopTick();
+    PomodoroService::instance().stopTick();
 
     // 若用户从外部切走（例如 StateManager 强制跳转），确保 Pomodoro 回到 IDLE
-    pomodoro_.reset();
+    PomodoroService::instance().reset();
 }
 
 // ── 消息处理 ──────────────────────────────────────────────────
@@ -51,7 +51,7 @@ void PomodoroState::onKeyEvent(const KeyEvent& event) {
     switch (event.id) {
     case KeyId::KEY1:
         if (event.action == KeyAction::DOWN) {
-            pomodoro_.onKey1();
+            PomodoroService::instance().onKey1();
         } else if (event.action == KeyAction::LONG_PRESS) {
             requestTransition(StateId::LAUNCH);
         }
@@ -61,7 +61,7 @@ void PomodoroState::onKeyEvent(const KeyEvent& event) {
         if (event.action == KeyAction::DOWN     ||
             event.action == KeyAction::LONG_PRESS ||
             event.action == KeyAction::LONG_REPEAT) {
-            pomodoro_.onKey2Short();
+            PomodoroService::instance().onKey2Short();
         }
         break;
     }

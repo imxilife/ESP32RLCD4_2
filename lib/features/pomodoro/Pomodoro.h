@@ -16,6 +16,13 @@
 
 class Pomodoro {
 public:
+    struct Snapshot {
+        bool running = false;
+        bool finished = false;
+        uint32_t remSec = 25 * 60;
+        uint32_t totalSec = 25 * 60;
+    };
+
     // 在首次进入 PomodoroState 时调用（懒初始化）
     //   queue          — 消息队列句柄
     //   defaultSec     — 设置界面初始时长（秒），默认 25 分钟
@@ -33,6 +40,7 @@ public:
 
     // 静默重置回 SETUP（PomodoroState::onExit 调用，不发消息）
     void reset();
+    Snapshot snapshot() const;
 
     // ── 按键事件入口（由 PomodoroState::onKeyEvent 调用）──────
     void onKey1();      // SETUP: 切换焦点；COUNTDOWN: 忽略短按
@@ -76,3 +84,7 @@ private:
     // update() 由 timerCallback 每 100ms 调用
     void update();
 };
+
+namespace PomodoroService {
+Pomodoro& instance();
+}

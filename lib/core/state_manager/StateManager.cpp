@@ -12,7 +12,14 @@
 #include <core/state/XZAIState.h>
 #include <core/state/BluetoothState.h>
 #include <core/state/OtaState.h>
+#include <features/memo/MemoService.h>
 #include <features/network/NetworkService.h>
+#include <features/voice_assistant/VoiceAssistantService.h>
+#include <features/weather/WeatherService.h>
+
+#ifndef ENABLE_FONT_TEST_STATE
+#define ENABLE_FONT_TEST_STATE 1
+#endif
 
 // ── 1. 注册 ────────────────────────────────────────────────────────────────
 // 注册一个子状态到状态表。
@@ -102,6 +109,9 @@ void StateManager::tickCurrentState() {
 
 void StateManager::beginWithStates(Gui& gui) {
     NetworkService::begin();
+    WeatherService::begin();
+    MemoService::begin();
+    VoiceAssistantService::begin();
 
     static LaunchState      stateLaunch(gui);
     static MainUIState      stateMainUI(gui);
@@ -121,5 +131,9 @@ void StateManager::beginWithStates(Gui& gui) {
     registerState(StateId::BLUETOOTH,    &stateBluetooth);
     registerState(StateId::OTA,          &stateOta);
 
+#if ENABLE_FONT_TEST_STATE
+    begin(StateId::FONT_TEST);
+#else
     begin(StateId::LAUNCH);
+#endif
 }
