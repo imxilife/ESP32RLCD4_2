@@ -18,10 +18,6 @@
 #include <features/voice_assistant/VoiceAssistantService.h>
 #include <features/weather/WeatherService.h>
 
-#ifndef ENABLE_FONT_TEST_STATE
-#define ENABLE_FONT_TEST_STATE 1
-#endif
-
 // ── 1. 注册 ────────────────────────────────────────────────────────────────
 // 注册一个子状态到状态表。
 // 将 state 存入以 id 为下标的槽位，并反向设置 state->manager_ 指针，
@@ -134,9 +130,7 @@ void StateManager::beginWithStates(Gui& gui) {
     registerState(StateId::BLUETOOTH,    &stateBluetooth);
     registerState(StateId::OTA,          &stateOta);
 
-#if ENABLE_FONT_TEST_STATE
-    begin(StateId::FONT_TEST);
-#else
-    begin(StateId::LAUNCH);
-#endif
+    // Diagnostic boot target: enter the SPIFFS font test first.
+    // FontBinTestState keeps KEY1 mapped back to LAUNCH for normal UI access.
+    begin(StateId::FONT_BIN_TEST);
 }
