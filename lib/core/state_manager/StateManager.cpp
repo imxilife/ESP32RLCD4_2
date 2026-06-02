@@ -124,5 +124,7 @@ void StateManager::beginWithStates(Gui& gui) {
     registerState(StateId::BLUETOOTH,    &stateBluetooth);
     registerState(StateId::OTA,          &stateOta);
 
-    begin(StateId::LAUNCH);
+    // Diagnostic boot target: enter the SPIFFS font test first.
+    // FontBinTestState keeps KEY1 mapped back to LAUNCH for normal UI access.
+    begin(StateId::FONT_BIN_TEST);
 }

@@ -22,11 +22,21 @@
 3. [lib/core/state_manager/StateManager.cpp](/Users/kelly/CodeRepo/demo/ESP32_RLCD4_2/lib/core/state_manager/StateManager.cpp)
 4. [lib/core/state/LaunchState.cpp](/Users/kelly/CodeRepo/demo/ESP32_RLCD4_2/lib/core/state/LaunchState.cpp)
 
+## 问题排查索引
+
+- 统一排查问题集：[docs/TROUBLESHOOTING_CASES.md](docs/TROUBLESHOOTING_CASES.md)
+- 已记录：`FontBinTestState` 显示 `font24.bin missing`，根因是只刷了固件、未刷 SPIFFS 文件系统分区；解决命令是 `pio run -e esp32s3box -t uploadfs`
+
+## 字体资源索引
+
+- `font24.bin` 制作、校验、打包和刷入流程：[docs/FONT24_BIN_GENERATION.md](docs/FONT24_BIN_GENERATION.md)
+
 ## 当前协作约定
 
 - `gui.display()` 是唯一刷屏出口
 - `g_msgQueue` 是主事件通道
 - 优先保持模块边界清晰：`core / ui / device / media / features`
+- `排查类问题解决后，必须把现象、验证链路、根因和修复方式补充到 docs/TROUBLESHOOTING_CASES.md，并在本文件“问题排查索引”里添加或更新记录`
 - `界面文案只按用户明确要求修改；未被明确指定时，不擅自新增提示词、操作说明或辅助文案`
 - `修改界面文案/字体/字号时，必须先检查文本真实像素宽度是否落入容器；不能仅按字符数、固定步进或主观估计直接提交`
 - `涉及板级外设排查时，先确认官方示例/BSP实际使用的协议模式和初始化路径，再看当前项目实现；不能只按引脚名主观推断`
@@ -40,8 +50,10 @@
 ## 常用命令
 
 ```bash
+python tools/gen_font24_bin.py
 pio run -e esp32s3box
 pio run -e esp32s3box -t upload
+pio run -e esp32s3box -t uploadfs
 pio device monitor
 ```
 ## 回复要求
