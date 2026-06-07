@@ -2,9 +2,7 @@
 
 #include <core/state_manager/StateManager.h>
 #include <ui/assets/Mp3ControlIcons.h>
-#include <ui/gui/fonts/Font_ascii_IBMPlexSans_Medium_20_20.h>
-#include <ui/gui/fonts/Font_ascii_IBMPlexSans_Medium_24_Var.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20.h>
+#include <ui/gui/fonts/FontManager.h>
 
 namespace {
 constexpr int kScreenW = 400;
@@ -26,10 +24,17 @@ constexpr int kPlaylistLabelW = kListW - 62;
 constexpr uint32_t kMarqueeStepMs = 120;
 constexpr uint32_t kMarqueeHoldSteps = 5;
 
-const Font* kListFont = &kFont_ascii_IBMPlexSans_Medium_20_20;
-const Font* kAsciiTitleFont = &kFont_ascii_IBMPlexSans_Medium_24_Var;
-const Font* kChineseTitleFont = &kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20;
-const Font* kInfoFont = &kFont_ascii_IBMPlexSans_Medium_20_20;
+const Font* listFont() {
+    return FontManager::instance().font(FontId::EnMain);
+}
+
+const Font* titleFont() {
+    return FontManager::instance().font(FontId::EnMain);
+}
+
+const Font* infoFont() {
+    return FontManager::instance().font(FontId::EnMain);
+}
 
 String marqueeTextToWidth(Gui& gui, const String& text, const Font* font, int maxWidth, uint32_t nowMs) {
     if (text.isEmpty() || font == nullptr) return text;
@@ -206,11 +211,12 @@ bool MusicPlayerState::hasVisibleOverflowLabels(const Mp3Controller::Snapshot& s
     if (!snap.hasPlaylist) return false;
     if (selectedIndex_ < listTopIndex_ || selectedIndex_ >= listTopIndex_ + kVisibleRows) return false;
     const String& title = controller_.trackAt(selectedIndex_).title;
-    return gui_.measureTextWidth(title.c_str(), kListFont) > kPlaylistLabelW;
+    return gui_.measureTextWidth(title.c_str(), listFont()) > kPlaylistLabelW;
 }
 
 void MusicPlayerState::drawPlaylist(const Mp3Controller::Snapshot& snap) {
-    gui_.setFont(kListFont);
+    const Font* font = listFont();
+    gui_.setFont(font);
     gui_.drawText(kListX + 12, kListY + 10, "PLAYLIST", ColorBlack, ColorWhite);
     gui_.drawLine(kListX + 12, kListY + 34, kListX + kListW - 12, kListY + 34, ColorBlack);
 
@@ -241,8 +247,8 @@ void MusicPlayerState::drawPlaylist(const Mp3Controller::Snapshot& snap) {
 
         const String& title = controller_.trackAt(index).title;
         const String visibleTitle = selected
-            ? marqueeTextToWidth(gui_, title, kListFont, kPlaylistLabelW, millis())
-            : fitTextToWidth(gui_, title, kListFont, kPlaylistLabelW);
+            ? marqueeTextToWidth(gui_, title, font, kPlaylistLabelW, millis())
+            : fitTextToWidth(gui_, title, font, kPlaylistLabelW);
         gui_.drawText(kListX + kPlaylistLabelX, rowY + 8, visibleTitle.c_str(),
                       selected ? ColorWhite : ColorBlack,
                       selected ? ColorBlack : ColorWhite);
@@ -261,14 +267,14 @@ void MusicPlayerState::drawNowPlaying(const Mp3Controller::Snapshot& snap) {
     const int innerW = kRightW - 32;
 
     String title = "NO MUSIC";
-    const Font* titleFont = kAsciiTitleFont;
+    const Font* activeTitleFont = titleFont();
     if (snap.hasPlaylist && !snap.track.title.isEmpty()) {
-        title = fitTextToWidth(gui_, snap.track.title, titleFont, innerW);
+        title = fitTextToWidth(gui_, snap.track.title, activeTitleFont, innerW);
     } else if (!snap.errorText.isEmpty()) {
-        title = fitTextToWidth(gui_, snap.errorText, kAsciiTitleFont, innerW);
+        title = fitTextToWidth(gui_, snap.errorText, activeTitleFont, innerW);
     }
 
-    gui_.setFont(titleFont);
+    gui_.setFont(activeTitleFont);
     gui_.drawText(innerX, kRightY + 18, title.c_str(), ColorBlack, ColorWhite);
 
     char line1[48];
@@ -278,7 +284,7 @@ void MusicPlayerState::drawNowPlaying(const Mp3Controller::Snapshot& snap) {
     } else {
         snprintf(line1, sizeof(line1), "%s", stateLabel(snap.state));
     }
-    gui_.setFont(kInfoFont);
+    gui_.setFont(infoFont());
     gui_.drawText(innerX, kRightY + 54, line1, ColorBlack, ColorWhite);
 
     char line2[48];

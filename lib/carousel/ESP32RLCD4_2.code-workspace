@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"path": "../../../ESP32-S3-RLCD-4.2-Demo/01_Arduino/examples/07_Audio_Testt"
+		}
+	],
+	"settings": {}
+}

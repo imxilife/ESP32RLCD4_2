@@ -1,6 +1,6 @@
 #include "GuiTests.h"
 #include <device/display/display_bsp.h>
-#include <ui/gui/fonts/Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_72_96.h>
+#include <ui/gui/fonts/FontManager.h>
 
 void GuiTests::testBasicShapes(Gui &gui) {
     gui.drawRect(5, 5, 80, 40, gui.foregroundColor());
@@ -26,12 +26,12 @@ void GuiTests::testTriangleAndLines(Gui &gui) {
 }
 
 void GuiTests::testAsciiText(Gui &gui) {
-    gui.setFont(&kFont_Alibaba72x96);
+    gui.setFont(FontManager::instance().font(FontId::EnMain));
     gui.drawText(10, 140, "12:34");
 }
 
 void GuiTests::testUTF8Text(Gui &gui) {
-    gui.setFont(&kFont_Alibaba72x96);
+    gui.setFont(FontManager::instance().font(FontId::EnMain));
     gui.drawText(10, 170, "56:78");
     gui.drawText(10, 210, "00:00", ColorBlack, ColorWhite);
 

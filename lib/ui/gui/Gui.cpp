@@ -3,7 +3,6 @@
 //
 
 #include "Gui.h"
-#include <ui/gui/fonts/Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_72_96.h>
 #include "effects/GlyphEffect.h"
 
 #include <stdlib.h>
@@ -78,7 +77,7 @@ Gui::Gui(DisplayPort *lcd, int width, int height)
       fgColor_(ColorBlack),
       bgColor_(ColorWhite),
       chineseGlyphProvider_(nullptr),
-      currentFont_(&kFont_Alibaba72x96),
+      currentFont_(nullptr),
       bigDigitEffect_(BigDigitEffectParamsDefault()) {}
 
 void Gui::clear(uint8_t color) {
@@ -515,17 +514,24 @@ int Gui::measureTextWidth(const char *utf8, const Font *font) const {
         if (codepoint == '\n') break;
 
         int w = 0, h = 0, stride = 0, advanceX = 0;
-        const uint8_t *glyph = nullptr;
+        bool found = false;
         for (const Font *f = activeFont; f != nullptr; f = f->fallback) {
-            if (f->getGlyph) {
-                glyph = f->getGlyph(codepoint, w, h, stride, advanceX, f->data);
+            // 测宽只需要 advanceX，优先走 metrics 路径，避免读取字形 bitmap。
+            if (f->getGlyphMetrics) {
+                found = f->getGlyphMetrics(codepoint, w, h, stride, advanceX, f->data);
+                if (found && w > 0 && h > 0 && stride > 0) {
+                    break;
+                }
+            } else if (f->getGlyph) {
+                const uint8_t *glyph = f->getGlyph(codepoint, w, h, stride, advanceX, f->data);
                 if (glyph && w > 0 && h > 0 && stride > 0) {
+                    found = true;
                     break;
                 }
             }
         }
 
-        width += (glyph && advanceX > 0) ? advanceX : 16;
+        width += (found && advanceX > 0) ? advanceX : 16;
     }
 
     return width;

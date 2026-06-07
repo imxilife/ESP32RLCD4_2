@@ -9,7 +9,6 @@
 #include <core/state/PomodoroState.h>
 #include <core/state/MusicPlayerState.h>
 #include <core/state/FontTestState.h>
-#include <core/state/FontBinTestState.h>
 #include <core/state/XZAIState.h>
 #include <core/state/BluetoothState.h>
 #include <core/state/OtaState.h>
@@ -17,6 +16,19 @@
 #include <features/network/NetworkService.h>
 #include <features/voice_assistant/VoiceAssistantService.h>
 #include <features/weather/WeatherService.h>
+
+namespace {
+
+// State trace separates service startup time from the active state's onEnter time.
+void logStateStep(const char* tag, uint32_t stepStartMs) {
+    const uint32_t now = millis();
+    Serial.printf("[StateTrace] %-24s t=%lu step=%lu\n",
+                  tag ? tag : "",
+                  static_cast<unsigned long>(now),
+                  static_cast<unsigned long>(now - stepStartMs));
+}
+
+}  // namespace
 
 // ── 1. 注册 ────────────────────────────────────────────────────────────────
 // 注册一个子状态到状态表。
@@ -36,8 +48,12 @@ void StateManager::begin(StateId initialState) {
     currentId_      = initialState;
     pendingId_      = initialState;
     transitPending_ = false;
+    const uint32_t enterStartMs = millis();
     if (current()) current()->onEnter();
-    Serial.printf("[StateManager] start: State %d\n", (int)initialState);
+    Serial.printf("[StateManager] start: State %d enterMs=%lu t=%lu\n",
+                  (int)initialState,
+                  static_cast<unsigned long>(millis() - enterStartMs),
+                  static_cast<unsigned long>(millis()));
 }
 
 // ── 3. 按键派发 ────────────────────────────────────────────────────────────
@@ -99,38 +115,64 @@ void StateManager::doTransition(StateId newId) {
 // 以 static 局部变量创建全部子状态，生命周期与程序相同。
 // 各状态所需的硬件对象（rtc/humiture/wifiConfig/pomodoro/audioCodec）
 // 已内化为各自状态的值成员，StateManager 无需再持有或传递这些依赖。
-// 完成注册后调用 begin(LAUNCH) 触发初始状态的 onEnter。
+// 完成注册后按调用方传入的 initialState 触发初始状态的 onEnter。
 void StateManager::tickCurrentState() {
     if (current()) current()->tick();
 }
 
-void StateManager::beginWithStates(Gui& gui) {
-    NetworkService::begin();
-    WeatherService::begin();
-    MemoService::begin();
-    VoiceAssistantService::begin();
+void StateManager::beginBackgroundServices() {
+    if (backgroundServicesStarted_) {
+        return;
+    }
+    backgroundServicesStarted_ = true;
 
+    Serial.printf("[StateTrace] background services start t=%lu\n",
+                  static_cast<unsigned long>(millis()));
+
+    uint32_t stepStartMs = millis();
+    NetworkService::begin();
+    logStateStep("NetworkService.begin", stepStartMs);
+
+    stepStartMs = millis();
+    WeatherService::begin();
+    logStateStep("WeatherService.begin", stepStartMs);
+
+    stepStartMs = millis();
+    MemoService::begin();
+    logStateStep("MemoService.begin", stepStartMs);
+
+    stepStartMs = millis();
+    VoiceAssistantService::begin();
+    logStateStep("VoiceAssistant.begin", stepStartMs);
+}
+
+void StateManager::beginWithStates(Gui& gui, StateId initialState) {
+    Serial.printf("[StateTrace] beginWithStates start initial=%d t=%lu\n",
+                  static_cast<int>(initialState),
+                  static_cast<unsigned long>(millis()));
+
+    uint32_t stepStartMs = millis();
     static LaunchState      stateLaunch(gui);
     static MainUIState      stateMainUI(gui);
     static PomodoroState    statePomodoro(gui);
     static MusicPlayerState stateMusic(gui);
     static FontTestState    stateFontTest(gui);
-    static FontBinTestState stateFontBinTest(gui);
     static XZAIState        stateXzai(gui);
     static BluetoothState   stateBluetooth(gui);
     static OtaState         stateOta(gui);
 
+    stepStartMs = millis();
     registerState(StateId::LAUNCH,       &stateLaunch);
     registerState(StateId::MAIN_UI,      &stateMainUI);
     registerState(StateId::POMODORO,     &statePomodoro);
     registerState(StateId::MUSIC_PLAYER, &stateMusic);
     registerState(StateId::FONT_TEST,    &stateFontTest);
-    registerState(StateId::FONT_BIN_TEST, &stateFontBinTest);
     registerState(StateId::XZAI,         &stateXzai);
     registerState(StateId::BLUETOOTH,    &stateBluetooth);
     registerState(StateId::OTA,          &stateOta);
+    logStateStep("register states", stepStartMs);
 
-    // Diagnostic boot target: enter the SPIFFS font test first.
-    // FontBinTestState keeps KEY1 mapped back to LAUNCH for normal UI access.
-    begin(StateId::FONT_BIN_TEST);
+    stepStartMs = millis();
+    begin(initialState);
+    logStateStep("begin initial state", stepStartMs);
 }

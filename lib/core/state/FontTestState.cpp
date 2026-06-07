@@ -1,184 +1,130 @@
 #include "FontTestState.h"
 
+#include <Arduino.h>
 #include <core/state_manager/StateManager.h>
-#include <ui/gui/fonts/Font_ascii_NotoSans_Medium_16_16_FontTest.h>
-#include <ui/gui/fonts/Font_ascii_NotoSans_Medium_18_18_FontTest.h>
-#include <ui/gui/fonts/Font_ascii_NotoSans_Medium_20_20_FontTest.h>
-#include <ui/gui/fonts/Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_12_18.h>
-#include <ui/gui/fonts/Font_ascii_RobotoMono_Light_16_16_FontTest.h>
-#include <ui/gui/fonts/Font_ascii_RobotoMono_Light_18_18_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_35_Thin_12_12_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_35_Thin_14_14_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_35_Thin_16_16_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_35_Thin_18_18_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_35_Thin_20_20_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_35_Thin_22_22_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_35_Thin_24_24_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_35_Thin_26_26_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_35_Thin_28_28_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_35_Thin_30_30_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_45_Light_12_12_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_45_Light_14_14_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_45_Light_16_16_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_45_Light_18_18_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_45_Light_20_20_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_45_Light_22_22_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_45_Light_24_24_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_45_Light_26_26_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_45_Light_28_28_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_45_Light_30_30_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_m_Medium_12_12_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_m_Medium_14_14_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_m_Medium_16_16_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_m_Medium_18_18_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_m_Medium_20_20_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_m_Medium_22_22_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_m_Medium_24_24_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_m_Medium_26_26_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_m_Medium_28_28_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_m_Medium_30_30_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_s_Medium_12_12_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_s_Medium_14_14_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_s_Medium_16_16_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_s_Medium_18_18_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_s_Medium_20_20_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_s_Medium_22_22_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_s_Medium_24_24_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_s_Medium_26_26_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_s_Medium_28_28_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_65_s_Medium_30_30_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_12_12_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_14_14_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_16_16_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_18_18_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_22_22_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_24_24_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_26_26_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_28_28_FontTest.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_30_30_FontTest.h>
+#include <ui/gui/fonts/FontManager.h>
+#include <cstdio>
+#include <cstring>
 
 namespace {
-constexpr bool kShowChineseFontTest = false;
-constexpr bool kShowEnglishFontTest = true;
-
-constexpr const char* kGlyphText = "\xE6\x88\x91";
-constexpr const char* kEnglishText =
-    "Everyone has the right to freedom of thought, conscience and religion;";
-
 constexpr int kScreenW = 400;
-constexpr int kLeftX = 20;
-constexpr int kRightMargin = 20;
-constexpr int kGlyphGap = 12;
-constexpr int kLabelToGlyphGap = 4;
-constexpr int kMaxGlyphH = 30;
-constexpr int kChineseRowGap = 6;
-constexpr int kSectionGap = 8;
-constexpr int kEnglishLabelGap = 8;
-constexpr int kEnglishRowGap = 6;
-constexpr int kWrapBufferSize = 180;
+constexpr int kZhMainY = 50;
+constexpr int kZhSubY = 90;
+constexpr int kEnMainY = 145;
+constexpr int kEnSubY = 205;
+constexpr int kLineGap = 4;
+constexpr size_t kLineBufferSize = 96;
+constexpr size_t kWordBufferSize = 32;
+constexpr bool kEnableGlyphProbe = false;
 
-const Font* const kLabelFont = &kFont_ascii_AlibabaPuHuiTi_3_75_SemiBold_12_18;
-constexpr const char* kChineseSizeLabels[] = {
-    "12", "14", "16", "18", "20", "22", "24", "26", "28", "30",
-};
+constexpr const char* kChineseSample =
+    "\xe7\x99\xbd\xe6\x97\xa5\xe4\xbe\x9d\xe5\xb1\xb1\xe5\xb0\xbd"
+    "\xef\xbc\x8c\xe9\xbb\x84\xe6\xb2\xb3\xe5\x85\xa5\xe6\xb5\xb7\xe6\xb5\x81";
+constexpr const char* kEnglishSample = "To be or not to be, that is the question";
 
-const Font* const kLightFonts[] = {
-    &kFont_chinese_AlibabaPuHuiTi_3_45_Light_12_12_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_45_Light_14_14_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_45_Light_16_16_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_45_Light_18_18_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_45_Light_20_20_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_45_Light_22_22_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_45_Light_24_24_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_45_Light_26_26_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_45_Light_28_28_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_45_Light_30_30_FontTest,
-};
-
-const Font* const kThinFonts[] = {
-    &kFont_chinese_AlibabaPuHuiTi_3_35_Thin_12_12_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_35_Thin_14_14_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_35_Thin_16_16_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_35_Thin_18_18_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_35_Thin_20_20_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_35_Thin_22_22_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_35_Thin_24_24_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_35_Thin_26_26_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_35_Thin_28_28_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_35_Thin_30_30_FontTest,
-};
-
-const Font* const kMediumSFonts[] = {
-    &kFont_chinese_AlibabaPuHuiTi_3_65_s_Medium_12_12_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_s_Medium_14_14_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_s_Medium_16_16_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_s_Medium_18_18_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_s_Medium_20_20_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_s_Medium_22_22_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_s_Medium_24_24_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_s_Medium_26_26_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_s_Medium_28_28_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_s_Medium_30_30_FontTest,
-};
-
-const Font* const kMediumMFonts[] = {
-    &kFont_chinese_AlibabaPuHuiTi_3_65_m_Medium_12_12_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_m_Medium_14_14_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_m_Medium_16_16_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_m_Medium_18_18_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_m_Medium_20_20_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_m_Medium_22_22_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_m_Medium_24_24_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_m_Medium_26_26_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_m_Medium_28_28_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_65_m_Medium_30_30_FontTest,
-};
-
-const Font* const kSemiBold75Fonts[] = {
-    &kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_12_12_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_14_14_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_16_16_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_18_18_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_22_22_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_24_24_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_26_26_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_28_28_FontTest,
-    &kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_30_30_FontTest,
-};
-
-constexpr int kChineseFontCount = sizeof(kLightFonts) / sizeof(kLightFonts[0]);
-
-int fontLineHeight(const Font* font) {
-    return (font != nullptr && font->lineHeight > 0) ? font->lineHeight : 0;
-}
-
-int chineseRowHeight() {
-    return fontLineHeight(kLabelFont) + kLabelToGlyphGap + kMaxGlyphH;
-}
-
-int chineseRowWidth(const Font* const* fonts) {
-    if (fonts == nullptr) return 0;
-
+struct TextProbe {
     int width = 0;
-    for (int i = 0; i < kChineseFontCount; ++i) {
-        width += fontLineHeight(fonts[i]);
+    int glyphCount = 0;
+    int missingCount = 0;
+    uint32_t firstMissing = 0;
+};
+
+bool decodeNextUtf8(const char*& p, uint32_t& codepoint) {
+    if (p == nullptr || *p == '\0') return false;
+
+    const uint8_t* s = reinterpret_cast<const uint8_t*>(p);
+    const uint8_t c = *s;
+    if (c < 0x80) {
+        codepoint = c;
+        ++p;
+        return true;
     }
-    width += (kChineseFontCount - 1) * kGlyphGap;
-    return width;
+
+    int extraBytes = 0;
+    if ((c & 0xE0) == 0xC0) {
+        extraBytes = 1;
+        codepoint = c & 0x1F;
+    } else if ((c & 0xF0) == 0xE0) {
+        extraBytes = 2;
+        codepoint = c & 0x0F;
+    } else if ((c & 0xF8) == 0xF0) {
+        extraBytes = 3;
+        codepoint = c & 0x07;
+    } else {
+        ++p;
+        return false;
+    }
+
+    ++s;
+    for (int i = 0; i < extraBytes; ++i) {
+        const uint8_t cc = *s;
+        if ((cc & 0xC0) != 0x80) {
+            ++p;
+            return false;
+        }
+        codepoint = (codepoint << 6) | (cc & 0x3F);
+        ++s;
+    }
+    p = reinterpret_cast<const char*>(s);
+    return true;
 }
 
-int appendSegment(char* dst, int dstSize, int dstLen, const char* src, int srcLen) {
-    if (dst == nullptr || src == nullptr || dstSize <= 0 || dstLen < 0) return dstLen;
+TextProbe probeTextGlyphs(const char* text, const Font* font) {
+    TextProbe probe;
+    if (text == nullptr || font == nullptr) return probe;
 
-    int outLen = dstLen;
-    while (srcLen > 0 && outLen < dstSize - 1) {
-        dst[outLen++] = *src++;
-        --srcLen;
+    const char* p = text;
+    uint32_t codepoint = 0;
+    while (decodeNextUtf8(p, codepoint)) {
+        int w = 0;
+        int h = 0;
+        int stride = 0;
+        int advanceX = 0;
+        const uint8_t* glyph = nullptr;
+        for (const Font* f = font; f != nullptr; f = f->fallback) {
+            if (f->getGlyph == nullptr) continue;
+            glyph = f->getGlyph(codepoint, w, h, stride, advanceX, f->data);
+            if (glyph != nullptr && w > 0 && h > 0 && stride > 0) break;
+        }
+
+        if (glyph != nullptr && advanceX > 0) {
+            ++probe.glyphCount;
+            probe.width += advanceX;
+        } else {
+            ++probe.missingCount;
+            if (probe.firstMissing == 0) probe.firstMissing = codepoint;
+            probe.width += 16;
+        }
     }
-    dst[outLen] = '\0';
-    return outLen;
+    return probe;
+}
+
+const Font* fontFor(FontId id) {
+    return FontManager::instance().font(id);
+}
+
+void logFontStatus(const char* tag, FontId id) {
+    const FontStatus status = FontManager::instance().status(id);
+    Serial.printf("[FontTest] status=%s loaded=%d psram=%d glyphs=%lu indexBytes=%lu path=%s error=%s\n",
+                  tag ? tag : "",
+                  status.loaded ? 1 : 0,
+                  status.indexInPsram ? 1 : 0,
+                  static_cast<unsigned long>(status.glyphCount),
+                  static_cast<unsigned long>(status.indexBytes),
+                  status.path ? status.path : "",
+                  status.error ? status.error : "");
+}
+
+void logAllFontStatus(const char* phase) {
+    Serial.printf("[FontTest] font status phase=%s failed=%s error=%s\n",
+                  phase ? phase : "",
+                  FontManager::instance().failedPath() ? FontManager::instance().failedPath() : "",
+                  FontManager::instance().lastError());
+    logFontStatus("zhMain", FontId::ZhMain);
+    logFontStatus("zhSub", FontId::ZhSub);
+    logFontStatus("enMain", FontId::EnMain);
+    logFontStatus("enSub", FontId::EnSub);
+    logFontStatus("digits60", FontId::Digits60);
 }
 }  // namespace
 
@@ -186,7 +132,14 @@ FontTestState::FontTestState(Gui& gui)
     : gui_(gui) {}
 
 void FontTestState::onEnter() {
+    const uint32_t enterStartMs = millis();
+    Serial.printf("[FontTest] onEnter start t=%lu\n",
+                  static_cast<unsigned long>(enterStartMs));
+    logAllFontStatus("enter");
     drawScreen();
+    logAllFontStatus("after-draw");
+    Serial.printf("[FontTest] onEnter end dur=%lu\n",
+                  static_cast<unsigned long>(millis() - enterStartMs));
 }
 
 void FontTestState::onExit() {}
@@ -204,126 +157,117 @@ void FontTestState::onKeyEvent(const KeyEvent& event) {
 }
 
 void FontTestState::drawScreen() {
+    const uint32_t screenStartMs = millis();
     gui_.clear(ColorWhite);
 
-    int nextY = 6;
-    if (kShowChineseFontTest) {
-        nextY = drawChineseFontTest(nextY) + kSectionGap;
+    Serial.printf("[FontTest] draw screen start t=%lu\n",
+                  static_cast<unsigned long>(screenStartMs));
+    drawTextLine("zhMain", kZhMainY, kChineseSample, fontFor(FontId::ZhMain));
+    drawTextLine("zhSub", kZhSubY, kChineseSample, fontFor(FontId::ZhSub));
+    drawTextLine("enMain", kEnMainY, kEnglishSample, fontFor(FontId::EnMain));
+    drawTextLine("enSub", kEnSubY, kEnglishSample, fontFor(FontId::EnSub));
+    Serial.printf("[FontTest] draw screen end dur=%lu\n",
+                  static_cast<unsigned long>(millis() - screenStartMs));
+}
+
+void FontTestState::drawTextLine(const char* tag, int y, const char* text, const Font* font) {
+    const uint32_t lineStartMs = millis();
+    if (text == nullptr || font == nullptr) {
+        Serial.printf("[FontTest] skip %s text=%p font=%p\n",
+                      tag ? tag : "",
+                      static_cast<const void*>(text),
+                      static_cast<const void*>(font));
+        return;
     }
-    if (kShowEnglishFontTest) {
-        drawEnglishFontTest(nextY);
+
+    TextProbe probe;
+    uint32_t probeMs = 0;
+    if (kEnableGlyphProbe) {
+        const uint32_t probeStartMs = millis();
+        probe = probeTextGlyphs(text, font);
+        probeMs = millis() - probeStartMs;
     }
-}
 
-int FontTestState::drawChineseFontTest(int topY) {
-    // Keep each font family in a separate row so size changes stay comparable.
-    int y = topY;
-    drawChineseFontRow(y, kLightFonts);
-    y += chineseRowHeight() + kChineseRowGap;
-    drawChineseFontRow(y, kThinFonts);
-    y += chineseRowHeight() + kChineseRowGap;
-    drawChineseFontRow(y, kMediumSFonts);
-    y += chineseRowHeight() + kChineseRowGap;
-    drawChineseFontRow(y, kMediumMFonts);
-    y += chineseRowHeight() + kChineseRowGap;
-    drawChineseFontRow(y, kSemiBold75Fonts);
-    return y + chineseRowHeight();
-}
+    const uint32_t measureStartMs = millis();
+    const int measuredW = gui_.measureTextWidth(text, font);
+    const uint32_t measureMs = millis() - measureStartMs;
+    Serial.printf("[FontTest] line=%s y=%d font=%p lineHeight=%d probeOn=%d probeW=%d measureW=%d glyphs=%d missing=%d firstMissing=U+%04lX probeMs=%lu measureMs=%lu\n",
+                  tag ? tag : "",
+                  y,
+                  static_cast<const void*>(font),
+                  font->lineHeight,
+                  kEnableGlyphProbe ? 1 : 0,
+                  probe.width,
+                  measuredW,
+                  probe.glyphCount,
+                  probe.missingCount,
+                  static_cast<unsigned long>(probe.firstMissing),
+                  static_cast<unsigned long>(probeMs),
+                  static_cast<unsigned long>(measureMs));
 
-void FontTestState::drawChineseFontRow(int topY, const Font* const* fonts) {
-    if (fonts == nullptr) return;
-
-    int x = (kScreenW - chineseRowWidth(fonts)) / 2;
-    for (int i = 0; i < kChineseFontCount; ++i) {
-        const Font* font = fonts[i];
-        if (font == nullptr) continue;
-        const int h = fontLineHeight(font);
-
-        gui_.setFont(kLabelFont);
-        const int labelW = gui_.measureTextWidth(kChineseSizeLabels[i], kLabelFont);
-        gui_.drawText(x + (h - labelW) / 2, topY,
-                      kChineseSizeLabels[i], ColorBlack, ColorWhite);
-
-        gui_.setFont(font);
-        gui_.drawText(x,
-                      topY + fontLineHeight(kLabelFont) + kLabelToGlyphGap + kMaxGlyphH - h,
-                      kGlyphText,
-                      ColorBlack,
-                      ColorWhite);
-        x += h + kGlyphGap;
+    if (measuredW <= kScreenW) {
+        drawCenteredLine(tag, y, text, font, measuredW);
+        Serial.printf("[FontTest] line=%s done totalMs=%lu\n",
+                      tag ? tag : "",
+                      static_cast<unsigned long>(millis() - lineStartMs));
+        return;
     }
-}
 
-void FontTestState::drawEnglishFontTest(int topY) {
-    // English rows use true measured width and an 8px label/content gap (two 4px units).
-    int y = topY;
-    y = drawEnglishSample(y, "16", &kFont_ascii_RobotoMono_Light_16_16_FontTest);
-    y += kEnglishRowGap;
-    y = drawEnglishSample(y, "18", &kFont_ascii_RobotoMono_Light_18_18_FontTest);
-    y += kEnglishRowGap;
-    y = drawEnglishSample(y, "16", &kFont_ascii_NotoSans_Medium_16_16_FontTest);
-    y += kEnglishRowGap;
-    y = drawEnglishSample(y, "18", &kFont_ascii_NotoSans_Medium_18_18_FontTest);
-    y += kEnglishRowGap;
-    drawEnglishSample(y, "20", &kFont_ascii_NotoSans_Medium_20_20_FontTest);
-}
-
-int FontTestState::drawEnglishSample(int topY, const char* sizeLabel, const Font* font) {
-    if (font == nullptr || sizeLabel == nullptr) return topY;
-
-    gui_.setFont(font);
-    const int labelW = gui_.measureTextWidth(sizeLabel, font);
-    const int textX = kLeftX + labelW + kEnglishLabelGap;
-    const int maxTextW = kScreenW - kRightMargin - textX;
-
-    gui_.drawText(kLeftX, topY, sizeLabel, ColorBlack, ColorWhite);
-    return drawWrappedAsciiText(textX, topY, maxTextW, kEnglishText, font);
-}
-
-int FontTestState::drawWrappedAsciiText(int x, int y, int maxWidth,
-                                        const char* text, const Font* font) {
-    if (text == nullptr || font == nullptr || maxWidth <= 0) return y;
-
-    // Word wrapping is local to this test page and avoids heap use on the embedded target.
-    char line[kWrapBufferSize] = {};
-    char candidate[kWrapBufferSize] = {};
-    int lineLen = 0;
-    int cursorY = y;
-    const int lineHeight = fontLineHeight(font);
-
+    // The English 18px sample is slightly wider than the 400px panel.
+    // Wrap on spaces so the requested text remains complete and unclipped.
+    char line[kLineBufferSize] = {};
     const char* p = text;
+    int lineY = y;
+
     while (*p != '\0') {
         while (*p == ' ') ++p;
         if (*p == '\0') break;
 
-        const char* wordStart = p;
-        int wordLen = 0;
-        while (p[wordLen] != '\0' && p[wordLen] != ' ') {
-            ++wordLen;
+        char word[kWordBufferSize] = {};
+        size_t wordLen = 0;
+        while (*p != '\0' && *p != ' ' && wordLen < kWordBufferSize - 1) {
+            word[wordLen++] = *p++;
         }
+        word[wordLen] = '\0';
+        while (*p != '\0' && *p != ' ') ++p;
 
-        int candidateLen = 0;
-        if (lineLen > 0) {
-            candidateLen = appendSegment(candidate, kWrapBufferSize, candidateLen, line, lineLen);
-            candidateLen = appendSegment(candidate, kWrapBufferSize, candidateLen, " ", 1);
-        }
-        candidateLen = appendSegment(candidate, kWrapBufferSize, candidateLen, wordStart, wordLen);
-
-        if (gui_.measureTextWidth(candidate, font) <= maxWidth || lineLen == 0) {
-            lineLen = appendSegment(line, kWrapBufferSize, 0, candidate, candidateLen);
+        char candidate[kLineBufferSize] = {};
+        if (line[0] == '\0') {
+            std::snprintf(candidate, sizeof(candidate), "%s", word);
         } else {
-            gui_.drawText(x, cursorY, line, ColorBlack, ColorWhite);
-            cursorY += lineHeight;
-            lineLen = appendSegment(line, kWrapBufferSize, 0, wordStart, wordLen);
+            std::snprintf(candidate, sizeof(candidate), "%s %s", line, word);
         }
 
-        p += wordLen;
+        if (line[0] != '\0' && gui_.measureTextWidth(candidate, font) > kScreenW) {
+            drawCenteredLine(tag, lineY, line, font, gui_.measureTextWidth(line, font));
+            lineY += font->lineHeight + kLineGap;
+            std::snprintf(line, sizeof(line), "%s", word);
+        } else {
+            std::snprintf(line, sizeof(line), "%s", candidate);
+        }
     }
 
-    if (lineLen > 0) {
-        gui_.drawText(x, cursorY, line, ColorBlack, ColorWhite);
-        cursorY += lineHeight;
+    if (line[0] != '\0') {
+        drawCenteredLine(tag, lineY, line, font, gui_.measureTextWidth(line, font));
     }
+    Serial.printf("[FontTest] line=%s done totalMs=%lu\n",
+                  tag ? tag : "",
+                  static_cast<unsigned long>(millis() - lineStartMs));
+}
 
-    return cursorY;
+void FontTestState::drawCenteredLine(const char* tag, int y, const char* text, const Font* font, int textW) {
+    if (text == nullptr || font == nullptr) return;
+
+    int x = (kScreenW - textW) / 2;
+    if (x < 0) x = 0;
+    const uint32_t drawStartMs = millis();
+    gui_.setFont(font);
+    gui_.drawText(x, y, text, ColorBlack, ColorWhite);
+    Serial.printf("[FontTest] draw=%s x=%d y=%d w=%d textBytes=%u drawMs=%lu\n",
+                  tag ? tag : "",
+                  x,
+                  y,
+                  textW,
+                  static_cast<unsigned int>(std::strlen(text)),
+                  static_cast<unsigned long>(millis() - drawStartMs));
 }

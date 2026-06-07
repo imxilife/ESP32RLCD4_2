@@ -17,9 +17,19 @@ public:
     void tick() override;
 
 private:
+    struct TimeRollAnimation {
+        bool active = false;
+        uint32_t startMs = 0;
+        uint32_t durationMs = 1000;
+        char fromDigits[5] = "0000";
+        char toDigits[5] = "0000";
+    };
+
     Gui& gui_;
     RTC85063 rtc_;
     RTCTime currentTime_ = {};
+    char visibleTimeDigits_[5] = "0000";
+    TimeRollAnimation timeRoll_;
     bool hasRtc_ = false;
     bool wifiConnected_ = false;
     float batteryVoltage_ = 0.0f;
@@ -46,5 +56,7 @@ private:
 
     const uint8_t* batteryIcon() const;
     void formatDate(char* out, size_t outSize) const;
+    void applyTimeUpdate(const RTCTime& nextTime);
+    void startTimeRollAnimation(const char* fromDigits, const char* toDigits);
     void handleNtpSync(const AppMessage& msg);
 };

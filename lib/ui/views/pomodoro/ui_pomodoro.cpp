@@ -2,42 +2,81 @@
 
 #include <device/display/display_bsp.h>
 #include <math.h>
+#include <cstdio>
+#include <ui/gui/fonts/FontManager.h>
 
-#include <ui/gui/fonts/Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_72_96.h>
-#include <ui/gui/fonts/Font_ascii_IBMPlexSans_Medium_20_20.h>
-#include <ui/gui/fonts/Font_ascii_Oswald_Light_28_40.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20_minsec.h>
+namespace {
 
-// ── 布局：设置界面 ────────────────────────────────────────────
-static const int kSetupTitleY     = 16;
-static const int kSetupTimeY      = 90;
-static const int kSetupBtnTextY   = 244;
-static const int kSetupBtnBorderY = 236;
-static const int kSetupBtnH       = 36;
-static const int kSetupBtnPad     = 8;
-static const int kNumBgPad        = 8;
+constexpr int kScreenW = 400;
+constexpr int kScreenH = 300;
+constexpr int kSetupTitleY = 16;
+constexpr int kSetupTimeY = 70;
+constexpr int kSetupLabelGap = 12;
+constexpr int kSetupBtnTextY = 244;
+constexpr int kSetupBtnBorderY = 236;
+constexpr int kSetupBtnH = 36;
+constexpr int kSetupBtnPad = 8;
+constexpr int kNumBgPad = 8;
+constexpr int kColonW = 18;
 
-// ── 布局：倒计时圆环 ──────────────────────────────────────────
-static const int   kRingCX      = 200;
-static const int   kRingCY      = 150;
-static const int   kRingInnerR  = 117;
-static const int   kRingInner5R = 109;
-static const int   kRingOuterR  = 125;
-static const int   kRingTicks   = 60;
+constexpr int kRingCX = 200;
+constexpr int kRingCY = 150;
+constexpr int kRingInnerR = 117;
+constexpr int kRingInner5R = 109;
+constexpr int kRingOuterR = 125;
+constexpr int kRingTicks = 60;
 
-// ── 字体尺寸常量 ──────────────────────────────────────────────
-static const int kBigW = 72;
-static const int kBigH = 96;
-static const int kSmW  = 20;
-static const int kSmH  = 20;
-static const int kOsW  = 28;
-static const int kOsH  = 40;
+const Font* enFont() {
+    return FontManager::instance().font(FontId::EnMain);
+}
 
-// ─────────────────────────────────────────────────────────────
+const Font* zhFont() {
+    return FontManager::instance().font(FontId::ZhSub);
+}
 
-static void drawProgressRing(Gui& gui, uint32_t remSec, uint32_t totalSec) {
+const Font* digitsFont() {
+    return FontManager::instance().font(FontId::Digits60);
+}
+
+void drawCenteredText(Gui& gui, int centerX, int y, const char* text, const Font* font,
+                      uint8_t fg = ColorBlack, uint8_t bg = ColorWhite) {
+    if (text == nullptr || font == nullptr) return;
+    const int textW = gui.measureTextWidth(text, font);
+    gui.setFont(font);
+    gui.drawText(centerX - textW / 2, y, text, fg, bg);
+}
+
+void drawColon(Gui& gui, int centerX, int topY, int height, uint8_t color) {
+    gui.fillCircle(centerX, topY + height * 34 / 100, 5, color);
+    gui.fillCircle(centerX, topY + height * 66 / 100, 5, color);
+}
+
+void drawLargePair(Gui& gui, int topY, const char* left, const char* right,
+                   int* leftXOut = nullptr, int* leftWOut = nullptr,
+                   int* rightXOut = nullptr, int* rightWOut = nullptr) {
+    const Font* font = digitsFont();
+    if (font == nullptr) return;
+
+    const int leftW = gui.measureTextWidth(left, font);
+    const int rightW = gui.measureTextWidth(right, font);
+    const int totalW = leftW + kColonW + rightW;
+    int x = (kScreenW - totalW) / 2;
+    if (x < 0) x = 0;
+
+    gui.setFont(font);
+    gui.drawText(x, topY, left, ColorBlack, ColorWhite);
+    drawColon(gui, x + leftW + kColonW / 2, topY, font->lineHeight, ColorBlack);
+    gui.drawText(x + leftW + kColonW, topY, right, ColorBlack, ColorWhite);
+
+    if (leftXOut != nullptr) *leftXOut = x;
+    if (leftWOut != nullptr) *leftWOut = leftW;
+    if (rightXOut != nullptr) *rightXOut = x + leftW + kColonW;
+    if (rightWOut != nullptr) *rightWOut = rightW;
+}
+
+void drawProgressRing(Gui& gui, uint32_t remSec, uint32_t totalSec) {
     int filled = (totalSec > 0)
-                 ? (int)((uint64_t)remSec * kRingTicks / totalSec)
+                 ? static_cast<int>((uint64_t)remSec * kRingTicks / totalSec)
                  : 0;
     if (filled > kRingTicks) filled = kRingTicks;
 
@@ -47,180 +86,139 @@ static void drawProgressRing(Gui& gui, uint32_t remSec, uint32_t totalSec) {
         float sa = sinf(angle);
 
         bool isMark = (i % 5 == 0);
-        int  innerR = isMark ? kRingInner5R : kRingInnerR;
+        int innerR = isMark ? kRingInner5R : kRingInnerR;
 
-        int x1 = kRingCX + (int)(innerR      * ca);
-        int y1 = kRingCY + (int)(innerR      * sa);
-        int x2 = kRingCX + (int)(kRingOuterR * ca);
-        int y2 = kRingCY + (int)(kRingOuterR * sa);
+        int x1 = kRingCX + static_cast<int>(innerR * ca);
+        int y1 = kRingCY + static_cast<int>(innerR * sa);
+        int x2 = kRingCX + static_cast<int>(kRingOuterR * ca);
+        int y2 = kRingCY + static_cast<int>(kRingOuterR * sa);
 
         uint8_t color = (i < filled) ? ColorBlack : ColorWhite;
         int px = (fabsf(sa) >= fabsf(ca)) ? 1 : 0;
         int py = (fabsf(sa) >= fabsf(ca)) ? 0 : 1;
-        gui.drawLine(x1,    y1,    x2,    y2,    color);
-        gui.drawLine(x1+px, y1+py, x2+px, y2+py, color);
+        gui.drawLine(x1, y1, x2, y2, color);
+        gui.drawLine(x1 + px, y1 + py, x2 + px, y2 + py, color);
     }
 }
 
-static void drawTimeLarge(Gui& gui, uint32_t remSec) {
+void drawTimeLarge(Gui& gui, uint32_t remSec) {
+    const Font* digitFont = digitsFont();
+    if (digitFont == nullptr) return;
+
     char sBuf[3];
-    snprintf(sBuf, sizeof(sBuf), "%02d", (int)remSec);
-    int totalH = kOsH + 8 + kSmH;
-    int ty = 150 - totalH / 2;
-    int tx = 200 - kOsW;
-    gui.setFont(&kFont_ascii_Oswald_Light_28_40);
-    gui.fillRect(tx, ty, 2 * kOsW, kOsH, ColorWhite);
-    gui.drawText(tx, ty, sBuf, ColorBlack, ColorWhite);
-    int secX = 200 - (3 * kSmW) / 2;
-    int secY = ty + kOsH + 8;
-    gui.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
-    secX = 200 - gui.measureTextWidth("sec", &kFont_ascii_IBMPlexSans_Medium_20_20) / 2;
-    gui.fillRect(secX, secY, gui.measureTextWidth("sec", &kFont_ascii_IBMPlexSans_Medium_20_20), kSmH, ColorWhite);
-    gui.drawText(secX, secY, "sec", ColorBlack, ColorWhite);
+    snprintf(sBuf, sizeof(sBuf), "%02d", static_cast<int>(remSec));
+    const int textW = gui.measureTextWidth(sBuf, digitFont);
+    const int x = (kScreenW - textW) / 2;
+    const int y = 82;
+    gui.fillRect(0, y - 4, kScreenW, digitFont->lineHeight + 36, ColorWhite);
+    gui.setFont(digitFont);
+    gui.drawText(x, y, sBuf, ColorBlack, ColorWhite);
+    drawCenteredText(gui, kScreenW / 2, y + digitFont->lineHeight + 8, "sec", enFont());
 }
 
-static void drawTimeSmall(Gui& gui, const char* fmtStr) {
-    int x = 200 - (5 * kOsW) / 2;
-    int y = 150 - kOsH / 2;
-    gui.setFont(&kFont_ascii_Oswald_Light_28_40);
-    gui.fillRect(x, y, 5 * kOsW, kOsH, ColorWhite);
-    gui.drawText(x, y, fmtStr, ColorBlack, ColorWhite);
+void drawTimeSmall(Gui& gui, const char* fmtStr) {
+    drawCenteredText(gui, kScreenW / 2, 140, fmtStr, enFont());
 }
 
-static void drawSetup(Gui& gui, uint8_t setH, uint8_t setM, uint8_t focus) {
+void drawFocusedDigits(Gui& gui, int x, int y, int w, const char* text, bool focused) {
+    const Font* font = digitsFont();
+    if (font == nullptr) return;
+    const int bgX = x - kNumBgPad;
+    const int bgY = y - kNumBgPad;
+    const int bgW = w + kNumBgPad * 2;
+    const int bgH = font->lineHeight + kNumBgPad * 2;
+    if (focused) {
+        gui.fillRoundRect(bgX, bgY, bgW, bgH, 8, ColorBlack);
+        gui.setFont(font);
+        gui.drawText(x, y, text, ColorWhite, ColorTransparent);
+    } else {
+        gui.fillRect(bgX, bgY, bgW, bgH, ColorWhite);
+        gui.setFont(font);
+        gui.drawText(x, y, text, ColorBlack, ColorWhite);
+    }
+}
+
+void drawSetup(Gui& gui, uint8_t setH, uint8_t setM, uint8_t focus) {
     gui.clear();
-    gui.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
-    gui.drawText((400 - gui.measureTextWidth("POMODORO", &kFont_ascii_IBMPlexSans_Medium_20_20)) / 2,
-                 kSetupTitleY, "POMODORO", ColorBlack, ColorWhite);
+    drawCenteredText(gui, kScreenW / 2, kSetupTitleY, "POMODORO", enFont());
 
-    static const int kTX = (400 - 5 * kBigW) / 2;
-    static const int kTY = kSetupTimeY;
-
-    char hBuf[3], mBuf[3];
+    char hBuf[3];
+    char mBuf[3];
     snprintf(hBuf, sizeof(hBuf), "%02d", setH);
     snprintf(mBuf, sizeof(mBuf), "%02d", setM);
 
-    bool hFocus = (focus == 0);  // Focus::HOURS
-    bool mFocus = (focus == 1);  // Focus::MINUTES
+    int hX = 0;
+    int hW = 0;
+    int mX = 0;
+    int mW = 0;
+    drawLargePair(gui, kSetupTimeY, hBuf, mBuf, &hX, &hW, &mX, &mW);
+    drawFocusedDigits(gui, hX, kSetupTimeY, hW, hBuf, focus == 0);
+    drawFocusedDigits(gui, mX, kSetupTimeY, mW, mBuf, focus == 1);
+    const Font* digitFont = digitsFont();
+    const int digitLineH = digitFont != nullptr ? digitFont->lineHeight : 60;
+    drawColon(gui, hX + hW + kColonW / 2, kSetupTimeY, digitLineH, ColorBlack);
 
-    gui.setFont(&kFont_Alibaba72x96);
+    const int setupLabelY = kSetupTimeY + digitLineH + kSetupLabelGap;
+    drawCenteredText(gui, hX + hW / 2, setupLabelY, "\xe5\x88\x86", zhFont());
+    drawCenteredText(gui, mX + mW / 2, setupLabelY, "\xe7\xa7\x92", zhFont());
 
-    // 分钟段（左侧）
-    {
-        int bgX  = kTX - kNumBgPad;
-        int bgY  = kTY - kNumBgPad;
-        int bgW  = 2 * kBigW + kNumBgPad;
-        int bgH  = kBigH + 2 * kNumBgPad;
-        int txtX = kTX - kNumBgPad / 2;
-        if (hFocus) {
-            gui.fillRoundRect(bgX, bgY, bgW, bgH, 8, ColorBlack);
-            gui.drawText(txtX, kTY, hBuf, ColorWhite, ColorTransparent);
-        } else {
-            gui.fillRect(bgX, bgY, bgW, bgH, ColorWhite);
-            gui.drawText(txtX, kTY, hBuf, ColorBlack, ColorWhite);
-        }
+    const Font* font = enFont();
+    const int exitW = gui.measureTextWidth("EXIT", font);
+    const int startW = gui.measureTextWidth("START", font);
+
+    const int exitX = 100 - exitW / 2;
+    bool exitFocused = (focus == 2);
+    int exitRx = exitX - kSetupBtnPad;
+    int exitRw = exitW + 2 * kSetupBtnPad;
+    if (exitFocused) {
+        gui.fillRoundRect(exitRx, kSetupBtnBorderY, exitRw, kSetupBtnH, 4, ColorBlack);
+    } else {
+        gui.fillRoundRect(exitRx, kSetupBtnBorderY, exitRw, kSetupBtnH, 4, ColorWhite);
+        gui.drawRoundRect(exitRx, kSetupBtnBorderY, exitRw, kSetupBtnH, 4, ColorBlack);
     }
+    gui.setFont(font);
+    gui.drawText(exitX, kSetupBtnTextY, "EXIT",
+                 exitFocused ? ColorWhite : ColorBlack,
+                 exitFocused ? ColorBlack : ColorWhite);
 
-    // 冒号
-    {
-        static const int kColonX  = kTX + 2 * kBigW + kBigW / 2;
-        static const int kColonR  = 7;
-        static const int kColonY1 = kTY + kBigH * 30 / 100;
-        static const int kColonY2 = kTY + kBigH * 70 / 100;
-        gui.fillRect(kTX + 2 * kBigW, kTY - kNumBgPad, kBigW, kBigH + 2 * kNumBgPad, ColorWhite);
-        gui.fillCircle(kColonX, kColonY1, kColonR, ColorBlack);
-        gui.fillCircle(kColonX, kColonY2, kColonR, ColorBlack);
+    const int startX = 300 - startW / 2;
+    bool startFocused = (focus == 3);
+    int startRx = startX - kSetupBtnPad;
+    int startRw = startW + 2 * kSetupBtnPad;
+    if (startFocused) {
+        gui.fillRoundRect(startRx, kSetupBtnBorderY, startRw, kSetupBtnH, 4, ColorBlack);
+    } else {
+        gui.fillRoundRect(startRx, kSetupBtnBorderY, startRw, kSetupBtnH, 4, ColorWhite);
+        gui.drawRoundRect(startRx, kSetupBtnBorderY, startRw, kSetupBtnH, 4, ColorBlack);
     }
-
-    // 秒钟段（右侧）
-    {
-        int secX = kTX + 3 * kBigW;
-        int bgX  = secX;
-        int bgY  = kTY - kNumBgPad;
-        int bgW  = 2 * kBigW + kNumBgPad;
-        int bgH  = kBigH + 2 * kNumBgPad;
-        int txtX = secX + kNumBgPad / 2;
-        if (mFocus) {
-            gui.fillRoundRect(bgX, bgY, bgW, bgH, 8, ColorBlack);
-            gui.drawText(txtX, kTY, mBuf, ColorWhite, ColorTransparent);
-        } else {
-            gui.fillRect(bgX, bgY, bgW, bgH, ColorWhite);
-            gui.drawText(txtX, kTY, mBuf, ColorBlack, ColorWhite);
-        }
-    }
-
-    // 标签 "分" / "秒"
-    {
-        static const int kLabelY = kSetupTimeY + kBigH + kNumBgPad + 4;
-        gui.setFont(&kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20_minsec);
-        gui.drawText(kTX + kBigW - kSmW / 2,          kLabelY,
-                     "\xe5\x88\x86", ColorBlack, ColorWhite);  // 分
-        gui.drawText(kTX + 3 * kBigW + kBigW - kSmW / 2, kLabelY,
-                     "\xe7\xa7\x92", ColorBlack, ColorWhite);  // 秒
-    }
-
-    // 按钮行
-    gui.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
-
-    // EXIT
-    {
-        static const int kW  = 4 * kSmW;
-        const int kTx = 100 - gui.measureTextWidth("EXIT", &kFont_ascii_IBMPlexSans_Medium_20_20) / 2;
-        bool focused = (focus == 2);  // Focus::EXIT
-        int rx = kTx - kSetupBtnPad;
-        int rw = kW  + 2 * kSetupBtnPad;
-        if (focused) {
-            gui.fillRoundRect(rx, kSetupBtnBorderY, rw, kSetupBtnH, 4, ColorBlack);
-        } else {
-            gui.fillRoundRect(rx, kSetupBtnBorderY, rw, kSetupBtnH, 4, ColorWhite);
-            gui.drawRoundRect(rx, kSetupBtnBorderY, rw, kSetupBtnH, 4, ColorBlack);
-        }
-        gui.drawText(kTx, kSetupBtnTextY, "EXIT",
-                     focused ? ColorWhite : ColorBlack,
-                     focused ? ColorBlack : ColorWhite);
-    }
-
-    // START
-    {
-        static const int kW  = 5 * kSmW;
-        const int kTx = 300 - gui.measureTextWidth("START", &kFont_ascii_IBMPlexSans_Medium_20_20) / 2;
-        bool focused = (focus == 3);  // Focus::START
-        int rx = kTx - kSetupBtnPad;
-        int rw = kW  + 2 * kSetupBtnPad;
-        if (focused) {
-            gui.fillRoundRect(rx, kSetupBtnBorderY, rw, kSetupBtnH, 4, ColorBlack);
-        } else {
-            gui.fillRoundRect(rx, kSetupBtnBorderY, rw, kSetupBtnH, 4, ColorWhite);
-            gui.drawRoundRect(rx, kSetupBtnBorderY, rw, kSetupBtnH, 4, ColorBlack);
-        }
-        gui.drawText(kTx, kSetupBtnTextY, "START",
-                     focused ? ColorWhite : ColorBlack,
-                     focused ? ColorBlack : ColorWhite);
-    }
+    gui.drawText(startX, kSetupBtnTextY, "START",
+                 startFocused ? ColorWhite : ColorBlack,
+                 startFocused ? ColorBlack : ColorWhite);
 }
 
-static void drawCountdown(Gui& gui, uint32_t remSec, uint32_t totalSec) {
-    gui.fillRect(0, 0, 400, 300, ColorWhite);
+void drawCountdown(Gui& gui, uint32_t remSec, uint32_t totalSec) {
+    gui.fillRect(0, 0, kScreenW, kScreenH, ColorWhite);
     drawProgressRing(gui, remSec, totalSec);
     if (remSec <= 60) {
         drawTimeLarge(gui, remSec);
     } else {
         char buf[8];
-        snprintf(buf, sizeof(buf), "%02d:%02d", (int)(remSec / 60), (int)(remSec % 60));
+        snprintf(buf, sizeof(buf), "%02d:%02d",
+                 static_cast<int>(remSec / 60),
+                 static_cast<int>(remSec % 60));
         drawTimeSmall(gui, buf);
     }
 }
 
-static void drawFinished(Gui& gui, bool blinkOn) {
+void drawFinished(Gui& gui, bool blinkOn) {
     uint8_t bg = blinkOn ? ColorWhite : ColorBlack;
     uint8_t fg = blinkOn ? ColorBlack : ColorWhite;
-    gui.fillRect(0, 0, 400, 300, bg);
-    gui.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
-    gui.drawText((400 - gui.measureTextWidth("DONE! HOLD KEY1", &kFont_ascii_IBMPlexSans_Medium_20_20)) / 2,
-                 (300 - kSmH) / 2, "DONE! HOLD KEY1", fg, bg);
+    gui.fillRect(0, 0, kScreenW, kScreenH, bg);
+    drawCenteredText(gui, kScreenW / 2, (kScreenH - 18) / 2,
+                     "DONE! HOLD KEY1", enFont(), fg, bg);
 }
 
-// ── 公共入口 ─────────────────────────────────────────────────
+}  // namespace
 
 void handlePomodoroUpdate(Gui& gui, const AppMessage& msg) {
     const PomodoroMsg& p = msg.pomodoro;
@@ -235,7 +233,6 @@ void handlePomodoroUpdate(Gui& gui, const AppMessage& msg) {
         drawFinished(gui, p.finished.blinkOn);
         break;
     case PomodoroEvent::EXIT:
-        // main.cpp 收到后负责 gui.clear() + resetClockState()
         break;
     }
 }

@@ -11,6 +11,5 @@ enum class StateId : uint8_t {
     XZAI         = 5,
     BLUETOOTH    = 6,   // 蓝牙 A2DP 播放
     OTA          = 7,
-    FONT_BIN_TEST = 8,
-    STATE_COUNT  = 9,
+    STATE_COUNT  = 8,
 };

@@ -25,6 +25,12 @@ struct Font {
                                int &advanceX,
                                const void *data);
 
+    /// 只查询字形度量，不读取 bitmap。测宽路径用它避免 SPIFFS 小块随机读取。
+    bool (*getGlyphMetrics)(uint32_t codepoint,
+                            int &w, int &h, int &strideBytes,
+                            int &advanceX,
+                            const void *data);
+
     /// 字体私有数据指针，透传给 getGlyph（可为 nullptr）
     const void *data;
 

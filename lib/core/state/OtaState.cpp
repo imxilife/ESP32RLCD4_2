@@ -4,8 +4,7 @@
 #include <device/display/display_bsp.h>
 #include <esp_system.h>
 #include <ui/gui/Font.h>
-#include <ui/gui/fonts/Font_ascii_IBMPlexSans_Medium_20_20.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20.h>
+#include <ui/gui/fonts/FontManager.h>
 
 #ifndef APP_VERSION
 #define APP_VERSION "0.1.0"
@@ -14,8 +13,7 @@
 namespace {
 constexpr int kScreenW = 400;
 constexpr int kScreenH = 300;
-constexpr int kBodyFontH = 20;
-constexpr int kTitleFontH = 20;
+constexpr int kBodyFontH = 18;
 constexpr int kPrimaryBtnW = 220;
 constexpr int kPrimaryBtnH = 44;
 constexpr int kPrimaryBtnX = (kScreenW - kPrimaryBtnW) / 2;
@@ -24,6 +22,14 @@ constexpr int kCardX = 40;
 constexpr int kCardW = 320;
 constexpr int kCardH = 74;
 constexpr int kHintBarY = 258;
+
+const Font* enFont() {
+    return FontManager::instance().font(FontId::EnMain);
+}
+
+const Font* zhFont() {
+    return FontManager::instance().font(FontId::ZhMain);
+}
 
 }
 
@@ -101,8 +107,8 @@ void OtaState::draw() {
         snprintf(versionLine, sizeof(versionLine), "FW %s", status_.currentVersion);
         formatIpDisplay(ipLine, sizeof(ipLine));
 
-        drawCenteredText(18, "OTA", &kFont_ascii_IBMPlexSans_Medium_20_20);
-        drawCenteredText(66, versionLine, &kFont_ascii_IBMPlexSans_Medium_20_20);
+        drawCenteredText(18, "OTA", enFont());
+        drawCenteredText(66, versionLine, enFont());
         drawButton(kPrimaryBtnX, kPrimaryBtnY, kPrimaryBtnW, kPrimaryBtnH, "CHECK OTA", true);
 
         if (status_.ip[0] != '\0') {
@@ -113,10 +119,10 @@ void OtaState::draw() {
         break;
     }
     case OtaPhase::CHECKING:
-        drawCenteredText(24, "OTA", &kFont_ascii_IBMPlexSans_Medium_20_20);
-        drawCenteredText(86, "CHECKING", &kFont_ascii_IBMPlexSans_Medium_20_20);
+        drawCenteredText(24, "OTA", enFont());
+        drawCenteredText(86, "CHECKING", enFont());
         drawCenteredText(116, status_.message[0] ? status_.message : "PLEASE WAIT",
-                         &kFont_ascii_IBMPlexSans_Medium_20_20);
+                         enFont());
         drawProgressBar(160, 0);
         drawHintBar("BUSY", "PLEASE WAIT");
         break;
@@ -125,28 +131,28 @@ void OtaState::draw() {
         char targetLine[48];
         snprintf(currentLine, sizeof(currentLine), "CURRENT %s", status_.currentVersion);
         snprintf(targetLine, sizeof(targetLine), "TARGET  %s", status_.targetVersion);
-        drawCenteredText(24, "UPDATE", &kFont_ascii_IBMPlexSans_Medium_20_20);
-        drawCenteredText(88, currentLine, &kFont_ascii_IBMPlexSans_Medium_20_20);
-        drawCenteredText(118, targetLine, &kFont_ascii_IBMPlexSans_Medium_20_20);
+        drawCenteredText(24, "UPDATE", enFont());
+        drawCenteredText(88, currentLine, enFont());
+        drawCenteredText(118, targetLine, enFont());
         drawButton(46, 170, 136, 44, "UPGRADE", true);
         drawButton(218, 170, 136, 44, "CANCEL", false);
         drawHintBar("KEY1 YES", "KEY2 NO");
         break;
     }
     case OtaPhase::UPDATING:
-        drawCenteredText(24, "UPDATING", &kFont_ascii_IBMPlexSans_Medium_20_20);
-        drawCenteredText(88, "KEEP POWER ON", &kFont_ascii_IBMPlexSans_Medium_20_20);
+        drawCenteredText(24, "UPDATING", enFont());
+        drawCenteredText(88, "KEEP POWER ON", enFont());
         drawCenteredText(118, status_.message[0] ? status_.message : "WRITING FIRMWARE",
-                         &kFont_ascii_IBMPlexSans_Medium_20_20);
+                         enFont());
         drawProgressBar(162, status_.progressPercent);
         drawHintBar("BUSY", "DO NOT EXIT");
         break;
     case OtaPhase::RESULT:
         drawCenteredText(28, status_.success ? "SUCCESS" : "FAILED",
-                         &kFont_ascii_IBMPlexSans_Medium_20_20);
+                         enFont());
         drawCenteredText(106, status_.message[0] ? status_.message :
                          (status_.success ? "DONE" : "EXIT"),
-                         &kFont_ascii_IBMPlexSans_Medium_20_20);
+                         enFont());
         if (status_.success) {
             drawProgressBar(162, 100);
             drawHintBar("REBOOT", "WAIT");
@@ -158,7 +164,7 @@ void OtaState::draw() {
 }
 
 void OtaState::drawCenteredText(int y, const char* text) {
-    drawCenteredText(y, text, &kFont_chinese_AlibabaPuHuiTi_3_75_SemiBold_20_20);
+    drawCenteredText(y, text, zhFont());
 }
 
 void OtaState::drawCenteredText(int y, const char* text, const Font* font,
@@ -178,8 +184,9 @@ void OtaState::drawButton(int x, int y, int w, int h, const char* label, bool fi
         gui_.drawRoundRect(x, y, w, h, 10, ColorBlack);
     }
 
-    gui_.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
-    int labelX = x + (w - gui_.measureTextWidth(label, &kFont_ascii_IBMPlexSans_Medium_20_20)) / 2;
+    const Font* font = enFont();
+    gui_.setFont(font);
+    int labelX = x + (w - gui_.measureTextWidth(label, font)) / 2;
     int labelY = y + (h - kBodyFontH) / 2;
     gui_.drawText(labelX, labelY, label,
                   filled ? ColorWhite : ColorBlack,
@@ -189,21 +196,21 @@ void OtaState::drawButton(int x, int y, int w, int h, const char* label, bool fi
 void OtaState::drawHintBar(const char* left, const char* right) {
     gui_.drawLine(24, kHintBarY - 10, kScreenW - 24, kHintBarY - 10, ColorBlack);
     if (left != nullptr && left[0] != '\0') {
-        gui_.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
+        gui_.setFont(enFont());
         gui_.drawText(24, kHintBarY, left, ColorBlack, ColorWhite);
     }
     if (right != nullptr && right[0] != '\0') {
-        int rightX = kScreenW - 24 - gui_.measureTextWidth(right, &kFont_ascii_IBMPlexSans_Medium_20_20);
+        int rightX = kScreenW - 24 - gui_.measureTextWidth(right, enFont());
         if (rightX < 0) rightX = 0;
-        gui_.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
+        gui_.setFont(enFont());
         gui_.drawText(rightX, kHintBarY, right, ColorBlack, ColorWhite);
     }
 }
 
 void OtaState::drawInfoCard(int x, int y, int w, int h, const char* title, const char* value) {
     gui_.drawRoundRect(x, y, w, h, 10, ColorBlack);
-    drawCenteredText(y + 10, title, &kFont_ascii_IBMPlexSans_Medium_20_20);
-    drawCenteredText(y + 40, value, &kFont_ascii_IBMPlexSans_Medium_20_20);
+    drawCenteredText(y + 10, title, enFont());
+    drawCenteredText(y + 40, value, enFont());
 }
 
 void OtaState::formatIpDisplay(char* out, size_t outSize) const {
@@ -238,5 +245,5 @@ void OtaState::drawProgressBar(int y, uint8_t percent) {
     }
 
     snprintf(percentText, sizeof(percentText), "%u%%", percent);
-    drawCenteredText(y + 34, percentText, &kFont_ascii_IBMPlexSans_Medium_20_20);
+    drawCenteredText(y + 34, percentText, enFont());
 }

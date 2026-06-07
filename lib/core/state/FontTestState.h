@@ -16,10 +16,6 @@ private:
     Gui& gui_;
 
     void drawScreen();
-    int drawChineseFontTest(int topY);
-    void drawChineseFontRow(int topY, const Font* const* fonts);
-    void drawEnglishFontTest(int topY);
-    int drawEnglishSample(int topY, const char* sizeLabel, const Font* font);
-    int drawWrappedAsciiText(int x, int y, int maxWidth,
-                             const char* text, const Font* font);
+    void drawTextLine(const char* tag, int y, const char* text, const Font* font);
+    void drawCenteredLine(const char* tag, int y, const char* text, const Font* font, int textW);
 };

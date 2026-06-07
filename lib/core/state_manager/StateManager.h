@@ -18,10 +18,13 @@ public:
     // 启动：设置初始状态并触发 onEnter
     void begin(StateId initialState);
 
-    // 创建并注册本项目全部子状态，然后调用 begin(LAUNCH)。
+    // 创建并注册本项目全部子状态，然后按 initialState 进入启动状态。
     // 子状态以 static 局部变量形式存活于程序生命周期，由本方法唯一持有。
     // 在 setup() 中替代逐一构造 + registerState + begin 三段样板代码。
-    void beginWithStates(Gui& gui);
+    void beginWithStates(Gui& gui, StateId initialState = StateId::LAUNCH);
+
+    // 首帧显示完成后启动网络、天气等后台服务，避免 WiFi/NTP 抢占启动首屏渲染。
+    void beginBackgroundServices();
 
     // 将队列消息转发给当前激活状态的 onMessage；
     // 处理完毕后检查是否有待执行的状态迁移
@@ -44,6 +47,7 @@ private:
     StateId        currentId_      = StateId::LAUNCH;
     StateId        pendingId_      = StateId::LAUNCH;
     bool           transitPending_ = false;
+    bool           backgroundServicesStarted_ = false;
 
     AbstractState* current() { return states_[static_cast<int>(currentId_)]; }
     void doTransition(StateId newId);

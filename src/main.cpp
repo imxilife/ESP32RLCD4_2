@@ -1,9 +1,8 @@
 #include <Arduino.h>
-#include <SPIFFS.h>
 #include <Wire.h>
 #include <device/display/display_bsp.h>
 #include <ui/gui/Gui.h>
-#include <ui/gui/fonts/Font24Spiffs.h>
+#include <ui/gui/fonts/FontManager.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/queue.h>
 #include <core/app_message/app_message.h>
@@ -14,6 +13,7 @@
 #define ENABLE_GUI_TESTS 0
 #define ENABLE_SDCARD_TESTS 0
 #define ENABLE_BT_TESTS 0
+#define ENABLE_FONT_TEST_BOOT 0
 
 // SPI 接口的反射 LCD 控制器（CS=12, DC=11, RST=5, SDA=40, SCL=41, 400×300）
 DisplayPort RlcdPort(12, 11, 5, 40, 41, 400, 300);
@@ -40,6 +40,19 @@ StateManager      stateManager;
 // 触摸屏中断引脚，-1 表示当前未接入
 static constexpr int kTouchIntPin = -1;
 
+static uint32_t g_setupStartMs = 0;
+static bool g_firstLoopDisplayLogged = false;
+
+// Boot trace keeps startup latency attribution visible without changing render flow.
+static void logBootStep(const char* tag, uint32_t stepStartMs) {
+    const uint32_t now = millis();
+    Serial.printf("[BootTrace] %-24s t=%lu total=%lu step=%lu\n",
+                  tag ? tag : "",
+                  static_cast<unsigned long>(now),
+                  static_cast<unsigned long>(now - g_setupStartMs),
+                  static_cast<unsigned long>(now - stepStartMs));
+}
+
 // 触摸中断服务程序（ISR）：将触摸事件写入消息队列
 // IRAM_ATTR 确保 ISR 代码常驻 IRAM，避免 Cache Miss 导致的执行延迟
 void IRAM_ATTR onTouchISR() {
@@ -58,44 +71,63 @@ void IRAM_ATTR onTouchISR() {
 
 void setup() {
     Serial.begin(115200);
+    g_setupStartMs = millis();
+    Serial.printf("[BootTrace] setup begin t=%lu\n",
+                  static_cast<unsigned long>(g_setupStartMs));
 
     // I2C 总线（RTC PCF85063 + 温湿度 SHTC3 + 音频 codec 共用）
+    uint32_t stepStartMs = millis();
     Wire.begin(13, 14);
+    logBootStep("Wire.begin", stepStartMs);
 
     // 创建 I2C 互斥锁（必须在任何后台任务启动之前）
+    stepStartMs = millis();
     g_i2cMutex = xSemaphoreCreateMutex();
     if (g_i2cMutex == nullptr) {
         Serial.println("创建 I2C 互斥锁失败！");
         while (1) delay(100);
     }
+    logBootStep("I2C mutex", stepStartMs);
 
     // 初始化反射 LCD，清屏并刷新一次确保白底显示
+    stepStartMs = millis();
     RlcdPort.RLCD_Init();
+    logBootStep("RLCD_Init", stepStartMs);
+
+    stepStartMs = millis();
     gui.setForegroundColor(ColorBlack);
     gui.setBackgroundColor(ColorWhite);
     gui.clear();
     gui.display();
+    logBootStep("initial display", stepStartMs);
 
-    // SPIFFS 字库属于可选资源：初始化失败不阻塞主流程，测试页会显示缺字占位。
-    if (!SPIFFS.begin(false)) {
-        Serial.println("[Font24] SPIFFS mount failed");
-    } else if (!gFont24Spiffs.begin(SPIFFS, "/font24.bin")) {
-        Serial.printf("[Font24] init failed: %s\n", gFont24Spiffs.lastError());
+    // SPIFFS 字库属于运行时资源：初始化失败不阻塞主流程，测试页会显示加载状态。
+    stepStartMs = millis();
+    if (!FontManager::instance().init()) {
+        Serial.printf("[FontManager] init failed: %s %s\n",
+                      FontManager::instance().failedPath() ? FontManager::instance().failedPath() : "",
+                      FontManager::instance().lastError());
     } else {
-        Serial.println("[Font24] /font24.bin ready");
+        Serial.println("[FontManager] init ready");
     }
+    logBootStep("FontManager.init", stepStartMs);
 
     // 创建全局消息队列（容量 16），后台任务和 ISR 通过它向 loop() 传递数据
+    stepStartMs = millis();
     g_msgQueue = xQueueCreate(16, sizeof(AppMessage));
     if (g_msgQueue == nullptr) {
         Serial.println("创建消息队列失败！");
         while (1) delay(100);
     }
+    logBootStep("queue create", stepStartMs);
 
     // 配置电池电压 ADC 引脚衰减（GPIO4，量程 0~3.3V）
+    stepStartMs = millis();
     analogSetPinAttenuation(4, ADC_11db);
+    logBootStep("ADC attenuation", stepStartMs);
 
     // 按键管理器初始化，注册监听器将 KeyEvent 转发给状态机
+    stepStartMs = millis();
     keyManager.begin();
     keyManager.addListener([](const KeyEvent& e) {
         if (g_msgQueue == nullptr) return;
@@ -108,11 +140,19 @@ void setup() {
                           static_cast<int>(e.id), static_cast<int>(e.action));
         }
     });
+    logBootStep("InputKey.begin", stepStartMs);
 
     // 创建全部子状态、注册并进入初始状态 LAUNCH（三步合一）
     // 各子状态所需硬件对象（rtc/humiture/wifiConfig/pomodoro/audioCodec）
     // 已内化为各自状态的值成员，main.cpp 只需传入共用的 Gui 引用
-    stateManager.beginWithStates(gui);
+    stepStartMs = millis();
+    stateManager.beginWithStates(
+        gui,
+        ENABLE_FONT_TEST_BOOT ? StateId::FONT_TEST : StateId::LAUNCH);
+    logBootStep("StateManager.begin", stepStartMs);
+
+    Serial.printf("[BootTrace] setup end total=%lu\n",
+                  static_cast<unsigned long>(millis() - g_setupStartMs));
 
 #if ENABLE_GUI_TESTS
     // GUI 测试：验证绘图原语和字体渲染，完成后延迟 5 秒并清屏
@@ -173,4 +213,15 @@ void loop() {
     stateManager.tickCurrentState();
 
     gui.display();
+    if (!g_firstLoopDisplayLogged) {
+        g_firstLoopDisplayLogged = true;
+        const uint32_t now = millis();
+        Serial.printf("[BootTrace] first loop display done t=%lu total=%lu\n",
+                      static_cast<unsigned long>(now),
+                      static_cast<unsigned long>(now - g_setupStartMs));
+
+        const uint32_t stepStartMs = millis();
+        stateManager.beginBackgroundServices();
+        logBootStep("Background services", stepStartMs);
+    }
 }

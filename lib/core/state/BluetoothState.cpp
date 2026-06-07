@@ -1,6 +1,6 @@
 #include "BluetoothState.h"
 #include <core/state_manager/StateManager.h>
-#include <ui/gui/fonts/Font_ascii_IBMPlexSans_Medium_20_20.h>
+#include <ui/gui/fonts/FontManager.h>
 
 BluetoothState::BluetoothState(Gui& gui) : gui_(gui) {}
 
@@ -54,18 +54,19 @@ void BluetoothState::onKeyEvent(const KeyEvent& event) {
 
 void BluetoothState::drawUI(const char* line1, const char* line2) {
     gui_.clear();
-    gui_.setFont(&kFont_ascii_IBMPlexSans_Medium_20_20);
+    const Font* font = FontManager::instance().font(FontId::EnMain);
+    gui_.setFont(font);
 
     static const int kScreenW = 400;
     static const int kScreenH = 300;
 
-    int x1 = (kScreenW - gui_.measureTextWidth(line1)) / 2;
+    int x1 = (kScreenW - gui_.measureTextWidth(line1, font)) / 2;
     int y1 = kScreenH / 2 - 30;
     if (x1 < 0) x1 = 0;
     gui_.drawText(x1, y1, line1, ColorBlack, ColorWhite);
 
     if (line2) {
-        int x2 = (kScreenW - gui_.measureTextWidth(line2)) / 2;
+        int x2 = (kScreenW - gui_.measureTextWidth(line2, font)) / 2;
         int y2 = y1 + 28;
         if (x2 < 0) x2 = 0;
         gui_.drawText(x2, y2, line2, ColorBlack, ColorWhite);

@@ -1,74 +1,90 @@
 #include "ui_clock.h"
-#include <ui/gui/Gui.h>
+
 #include <device/display/display_bsp.h>
-#include <ui/gui/fonts/Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_72_96.h>
-#include <ui/gui/fonts/Font_chinese_AlibabaPuHuiTi_3_75_SemiBold_18_18.h>
-#include <ui/gui/fonts/Font_ascii_AlibabaPuHuiTi_3_75_SemiBold_12_18.h>
+#include <cstdio>
+#include <ui/gui/Gui.h>
+#include <ui/gui/fonts/FontManager.h>
 
 extern Gui gui;
 
-// ── 时间显示参数（居中，大号 72x96）──────────────────────────
-static const int kTimeCharW  = 72;
-static const int kTimeCharH  = 96;
-static const int kTimeStrLen = 5;   // "HH:MM"
-static const int kTimeX = (400 - kTimeStrLen * kTimeCharW) / 2;
-static const int kTimeY = (300 - kTimeCharH) / 2;
+namespace {
 
-// ── 日期/星期显示参数（右上角，同一行）──────────────────────────
-static const int kDateY           = 8;
-static const int kDateRightMargin = 10;
+constexpr int kScreenW = 400;
+constexpr int kDateY = 8;
+constexpr int kDateRightMargin = 10;
+constexpr int kTimeY = 92;
+constexpr int kColonW = 18;
 
-// 星期名称（UTF-8，周X 格式，与 18x18 字体字符集匹配）
-static const char *kWeekNames[7] = {
-    "\xe5\x91\xa8\xe6\x97\xa5",  // 周日
-    "\xe5\x91\xa8\xe4\xb8\x80",  // 周一
-    "\xe5\x91\xa8\xe4\xba\x8c",  // 周二
-    "\xe5\x91\xa8\xe4\xb8\x89",  // 周三
-    "\xe5\x91\xa8\xe5\x9b\x9b",  // 周四
-    "\xe5\x91\xa8\xe4\xba\x94",  // 周五
-    "\xe5\x91\xa8\xe5\x85\xad",  // 周六
+const char* kWeekNames[7] = {
+    "\xe5\x91\xa8\xe6\x97\xa5",
+    "\xe5\x91\xa8\xe4\xb8\x80",
+    "\xe5\x91\xa8\xe4\xba\x8c",
+    "\xe5\x91\xa8\xe4\xb8\x89",
+    "\xe5\x91\xa8\xe5\x9b\x9b",
+    "\xe5\x91\xa8\xe4\xba\x94",
+    "\xe5\x91\xa8\xe5\x85\xad",
 };
 
-static uint8_t s_lastMinute = 0xFF;
-static uint8_t s_lastDay    = 0xFF;
+uint8_t s_lastMinute = 0xFF;
+uint8_t s_lastDay = 0xFF;
 
-void drawTime(const RTCTime &t) {
-    char timeBuf[8];
-    snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", t.hour, t.minute);
-    gui.fillRect(kTimeX, kTimeY, kTimeStrLen * kTimeCharW, kTimeCharH, ColorWhite);
-    gui.setFont(&kFont_Alibaba72x96);
-    gui.drawText(kTimeX, kTimeY, timeBuf);
+}  // namespace
+
+void drawTime(const RTCTime& t) {
+    const Font* font = FontManager::instance().font(FontId::Digits60);
+    if (font == nullptr) return;
+
+    char hourBuf[4];
+    char minuteBuf[4];
+    snprintf(hourBuf, sizeof(hourBuf), "%02d", t.hour);
+    snprintf(minuteBuf, sizeof(minuteBuf), "%02d", t.minute);
+
+    // The project digit bin contains digits only, so the colon remains a primitive.
+    const int hourW = gui.measureTextWidth(hourBuf, font);
+    const int minuteW = gui.measureTextWidth(minuteBuf, font);
+    const int totalW = hourW + kColonW + minuteW;
+    int x = (kScreenW - totalW) / 2;
+    if (x < 0) x = 0;
+
+    gui.fillRect(0, kTimeY - 4, kScreenW, font->lineHeight + 8, ColorWhite);
+    gui.setFont(font);
+    gui.drawText(x, kTimeY, hourBuf, ColorBlack, ColorWhite);
+
+    const int colonX = x + hourW + kColonW / 2;
+    gui.fillCircle(colonX, kTimeY + font->lineHeight * 34 / 100, 4, ColorBlack);
+    gui.fillCircle(colonX, kTimeY + font->lineHeight * 66 / 100, 4, ColorBlack);
+
+    gui.drawText(x + hourW + kColonW, kTimeY, minuteBuf, ColorBlack, ColorWhite);
 }
 
-void drawDateWeek(const RTCTime &t) {
+void drawDateWeek(const RTCTime& t) {
+    const Font* dateFont = FontManager::instance().font(FontId::EnSub);
+    const Font* weekFont = FontManager::instance().font(FontId::ZhSub);
+    if (dateFont == nullptr || weekFont == nullptr) return;
+
     char dateBuf[8];
     snprintf(dateBuf, sizeof(dateBuf), "%02d/%02d", t.month, t.day);
 
-    // 同一行：[周X] [MM/DD]，右对齐
-    static const int kDateCharW = 12;  // 12×18 date font advance
-    static const int kWeekCharW = 18;  // 18×18 weekday font advance
-    static const int kGap       = 6;   // gap between weekday and date
+    constexpr int kGap = 6;
+    const uint8_t wd = t.weekday < 7 ? t.weekday : 0;
+    const int dateW = gui.measureTextWidth(dateBuf, dateFont);
+    const int weekW = gui.measureTextWidth(kWeekNames[wd], weekFont);
+    const int totalW = weekW + kGap + dateW;
 
-    int dateW = 5 * kDateCharW;        // "MM/DD" = 5 chars = 60px
-    int weekW = 2 * kWeekCharW;        // "周X"   = 2 chars = 36px
-    int totalW = weekW + kGap + dateW; // 102px total
+    int clearX = kScreenW - totalW - kDateRightMargin;
+    if (clearX < 0) clearX = 0;
+    gui.fillRect(clearX - 2, kDateY - 2, totalW + 4, 28, ColorWhite);
 
-    int clearX = 400 - totalW - kDateRightMargin;
-    int clearH = 18 + 4;
-    gui.fillRect(clearX - 2, kDateY - 2, totalW + 4, clearH, ColorWhite);
+    const int dateX = clearX;
+    const int weekX = dateX + dateW + kGap;
 
-    int dateX = clearX;
-    int weekX = dateX + dateW + kGap;
-
-    gui.setFont(&kFont_ascii_AlibabaPuHuiTi_3_75_SemiBold_12_18);
+    gui.setFont(dateFont);
     gui.drawText(dateX, kDateY, dateBuf, ColorBlack, ColorWhite);
-
-    uint8_t wd = t.weekday < 7 ? t.weekday : 0;
-    gui.setFont(&kFont18_AlibabaPuHuiTi_3_75_SemiBold);
+    gui.setFont(weekFont);
     gui.drawText(weekX, kDateY, kWeekNames[wd], ColorBlack, ColorWhite);
 }
 
-void handleRtcUpdate(const RTCTime &t) {
+void handleRtcUpdate(const RTCTime& t) {
     if (t.minute != s_lastMinute) {
         drawTime(t);
         s_lastMinute = t.minute;
@@ -81,5 +97,5 @@ void handleRtcUpdate(const RTCTime &t) {
 
 void resetClockState() {
     s_lastMinute = 0xFF;
-    s_lastDay    = 0xFF;
+    s_lastDay = 0xFF;
 }
