@@ -9,6 +9,8 @@ constexpr int kHomeRowIconW = 20;
 constexpr int kHomeRowIconH = 20;
 constexpr int kWeatherIconW = 20;
 constexpr int kWeatherIconH = 20;
+constexpr int kPomodoroIconW = 24;
+constexpr int kPomodoroIconH = 24;
 extern const uint8_t kWifi[];
 extern const uint8_t kNoWifi[];
 extern const uint8_t kBattery25[];

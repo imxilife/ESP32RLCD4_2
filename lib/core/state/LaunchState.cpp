@@ -37,6 +37,8 @@ constexpr int kRightTextMaxW = kScreenW - kRightTextX - 24;
 constexpr int kWeatherY = 68;
 constexpr int kPomodoroY = 126;
 constexpr int kMemoY = 184;
+constexpr int kPomodoroIconOffsetX = 2 - ((HomeBitmapAssets::kPomodoroIconW - HomeBitmapAssets::kHomeRowIconW) / 2);
+constexpr int kPomodoroIconOffsetY = 7 - ((HomeBitmapAssets::kPomodoroIconH - HomeBitmapAssets::kHomeRowIconH) / 2);
 
 constexpr int kVoiceX = 20;
 constexpr int kVoiceY = 258;
@@ -216,7 +218,10 @@ void LaunchState::drawWeatherRow(int y) {
 }
 
 void LaunchState::drawPomodoroRow(int y) {
-    drawHomeRowIcon(kRightIconX + 2, y + 7, HomeBitmapAssets::kPomodoroClock);
+    // 番茄钟使用 24x24 专用取模，减少 20x20 缩放造成的细节粘连。
+    gui_.drawBitmap(kRightIconX + kPomodoroIconOffsetX, y + kPomodoroIconOffsetY,
+                    HomeBitmapAssets::kPomodoroIconW, HomeBitmapAssets::kPomodoroIconH,
+                    HomeBitmapAssets::kPomodoroClock, ColorBlack);
 
     const Pomodoro::Snapshot snap = PomodoroService::instance().snapshot();
     const uint32_t rem = snap.remSec;
